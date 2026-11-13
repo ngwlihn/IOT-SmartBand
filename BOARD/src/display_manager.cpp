@@ -3,8 +3,10 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
+#include <qrcode.h>
 
 #include "config.h"
+#include "text_utils.h"
 
 namespace {
 Adafruit_SSD1306 display(Config::OLED_WIDTH, Config::OLED_HEIGHT, &Wire1, -1);
@@ -132,6 +134,128 @@ void DisplayManager::showEmergency() {
   if (available_) display.display();
 }
 
+void DisplayManager::showEmergencyMedicalQr(const char* qrText, const char* bloodGroup, const char* condition, const char* phone, const char* name) {
+  reset();
+  if (!available_) return;
+
+  // Lọc sạch dấu tiếng Việt và ký tự đặc biệt sang chuẩn ASCII an toàn cho màn hình OLED SSD1306
+  String cleanBlood = TextUtils::removeDiacritics(bloodGroup ? bloodGroup : "");
+  cleanBlood.trim();
+  cleanBlood.toUpperCase();
+  if (cleanBlood.isEmpty() || cleanBlood.indexOf("CHUA") >= 0 || cleanBlood == "--") {
+    cleanBlood = "--";
+  }
+
+  String cleanCond = TextUtils::removeDiacritics(condition ? condition : "");
+  cleanCond.trim();
+  cleanCond.toUpperCase();
+  if (cleanCond.isEmpty()) cleanCond = "CAP CUU";
+
+  String cleanPhone = TextUtils::removeDiacritics(phone ? phone : "");
+  cleanPhone.trim();
+  if (cleanPhone.isEmpty()) cleanPhone = "115";
+
+  String cleanName = TextUtils::removeDiacritics(name ? name : "");
+  cleanName.trim();
+  cleanName.toUpperCase();
+
+  // Chuẩn bị nội dung QR Code:
+  // QUY TẮC: Văn bản thuần túy (Plain Text) chứa thông tin nạn nhân để cấp cứu.
+  // Tuyệt đối KHÔNG dùng MECARD: (để không bị điện thoại hiểu nhầm là danh bạ / thêm vào danh bạ).
+  String payload;
+  if (qrText && qrText[0] && strncmp(qrText, "MECARD:", 7) != 0 && strncmp(qrText, "http", 4) != 0) {
+    payload = TextUtils::removeDiacritics(qrText);
+  } else {
+    // Tự sinh nội dung thông tin nạn nhân dạng Plain Text dễ đọc cho mọi app camera/Zalo
+    payload = "THONG TIN NAN NHAN\n";
+    if (cleanName.length() > 0) {
+      payload += "Ho ten: " + cleanName + "\n";
+    }
+    payload += "Nhom mau: " + cleanBlood + "\n";
+    payload += "Benh ly: " + cleanCond + "\n";
+    payload += "LH: " + cleanPhone;
+  }
+
+  // Tự động chọn phiên bản QR Code phù hợp với độ dài văn bản
+  const size_t len = payload.length();
+  uint8_t targetVer = 3;
+  if (len <= 53) targetVer = 3;
+  else if (len <= 78) targetVer = 4;
+  else if (len <= 106) targetVer = 5;
+  else if (len <= 134) targetVer = 6;
+  else targetVer = 7;
+
+  QRCode qrcode;
+  uint8_t qrcodeData[qrcode_getBufferSize(7)];
+  int8_t initRes = -1;
+
+  for (uint8_t v = targetVer; v <= 7; ++v) {
+    initRes = qrcode_initText(&qrcode, qrcodeData, v, ECC_LOW, payload.c_str());
+    if (initRes == 0) break;
+  }
+
+  if (initRes != 0) {
+    // Dự phòng an toàn nếu chuỗi quá dài: rút gọn để vừa Version 3
+    char fallbackText[64];
+    snprintf(fallbackText, sizeof(fallbackText), "NAN NHAN: %.10s\nMAU: %s\nBENH: %.10s\nLH: %s",
+             cleanName.c_str(), cleanBlood.c_str(), cleanCond.c_str(), cleanPhone.c_str());
+    qrcode_initText(&qrcode, qrcodeData, 3, ECC_LOW, fallbackText);
+  }
+
+  // Nếu QR size <= 29 (Version <= 3) thì vẽ scale 2x (58x58px) siêu nét, dễ quét.
+  // Nếu QR size > 29 (Version >= 4) thì vẽ scale 1x căn giữa dọc.
+  const uint8_t scale = (qrcode.size <= 29) ? 2 : 1;
+  const int16_t qrPx = qrcode.size * scale;
+  const int16_t border = (scale == 2) ? 1 : 2;
+  const int16_t startX = (scale == 2) ? 2 : 4;
+  const int16_t startY = (64 - qrPx) / 2;
+
+  // Hộp nền trắng (Quiet Zone) giúp camera mọi điện thoại nhận diện mã ngay lập tức
+  display.fillRect(startX - border, startY - border, qrPx + (border * 2), qrPx + (border * 2), SSD1306_WHITE);
+
+  // Vẽ các module QR đen trên nền trắng
+  for (uint8_t y = 0; y < qrcode.size; y++) {
+    for (uint8_t x = 0; x < qrcode.size; x++) {
+      if (qrcode_getModule(&qrcode, x, y)) {
+        display.fillRect(startX + (x * scale), startY + (y * scale), scale, scale, SSD1306_BLACK);
+      }
+    }
+  }
+
+  // Cột thông tin hiển thị bên phải màn hình LED OLED (thuần ASCII, không lỗi font)
+  const int16_t textX = startX + qrPx + border + 4;
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+
+  display.setCursor(textX, 2);
+  display.print("SOS Y TE");
+  display.drawLine(textX, 11, 127, 11, SSD1306_WHITE);
+
+  // Dòng 1: Tên nạn nhân (hoặc NAN NHAN)
+  display.setCursor(textX, 15);
+  if (cleanName.length() > 0) {
+    display.printf("%.11s", cleanName.c_str());
+  } else {
+    display.print("NAN NHAN");
+  }
+
+  // Dòng 2: Nhóm máu
+  display.setCursor(textX, 26);
+  display.printf("MAU: %s", cleanBlood.c_str());
+
+  // Dòng 3: Bệnh nền
+  display.setCursor(textX, 37);
+  display.printf("%.11s", cleanCond.c_str());
+
+  // Dòng 4: SĐT người thân
+  display.setCursor(textX, 48);
+  display.print("LH:");
+  display.setCursor(textX, 56);
+  display.printf("%.11s", cleanPhone.c_str());
+
+  display.display();
+}
+
 void DisplayManager::showSos() {
   reset();
   center("SOS", 10, 2);
@@ -168,13 +292,14 @@ void DisplayManager::reset() {
 }
 
 void DisplayManager::center(const char* text, int16_t y, uint8_t size) {
-  if (!available_) return;
+  if (!available_ || !text) return;
+  String clean = TextUtils::removeDiacritics(text);
   int16_t x1, y1;
   uint16_t width, height;
   display.setTextSize(size);
-  display.getTextBounds(text, 0, y, &x1, &y1, &width, &height);
+  display.getTextBounds(clean.c_str(), 0, y, &x1, &y1, &width, &height);
   display.setCursor(max(0, (128 - static_cast<int>(width)) / 2), y);
-  display.print(text);
+  display.print(clean.c_str());
 }
 
 const char* DisplayManager::weatherName(int code) const {

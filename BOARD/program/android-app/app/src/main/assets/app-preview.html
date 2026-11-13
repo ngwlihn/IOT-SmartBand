@@ -625,7 +625,12 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
+          <!-- Đổi IP Máy Chủ / Wi-Fi button -->
+          <button onclick="openServerConfigModal()" class="px-2 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold flex items-center gap-1 shadow-2xs transition cursor-pointer" title="Cấu hình IP máy chủ khi đổi Wi-Fi">
+            <i class="fa-solid fa-wifi text-[9px]"></i>
+            <span id="headerServerIpLabel">Đổi IP</span>
+          </button>
           <!-- Online status -->
           <span id="kitOnlineBadge" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold flex items-center gap-1.5 shadow-2xs">
             <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
@@ -648,6 +653,20 @@
             Đã an toàn
           </button>
         </div>
+      </div>
+
+      <!-- Geofence Safe Radius Warning Banner -->
+      <div id="geofenceWarningBanner" class="bg-amber-600 text-white px-3 py-2 flex items-center justify-between hidden shadow-md z-20">
+        <div class="flex items-center gap-2 text-xs font-black min-w-0">
+          <i class="fa-solid fa-triangle-exclamation text-amber-200 text-sm shrink-0"></i>
+          <div class="min-w-0 truncate">
+            <p class="text-[11px] font-black leading-tight truncate">⚠️ RỜI VÙNG AN TOÀN</p>
+            <p class="text-[10px] text-amber-100 font-medium truncate">Cách nhà <span id="geofenceBannerDistance" class="font-bold underline">...</span></p>
+          </div>
+        </div>
+        <button onclick="setMainTab('tracking')" class="px-2.5 py-1 bg-white text-amber-800 text-[10px] font-black rounded-lg shadow-xs hover:bg-amber-50 active:scale-95 whitespace-nowrap shrink-0 flex items-center gap-1">
+          <i class="fa-solid fa-location-arrow text-[9px]"></i> Xem bản đồ
+        </button>
       </div>
 
       <!-- Scrollable Tab Content Container -->
@@ -727,20 +746,34 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2.5">
+        <div class="grid grid-cols-3 gap-2">
           <div>
-            <label class="block font-bold text-slate-700 mb-1">Tuổi tác <span class="text-rose-500">*</span></label>
+            <label class="block font-bold text-slate-700 mb-1">Tuổi <span class="text-rose-500">*</span></label>
             <div class="relative">
-              <i class="fa-solid fa-cake-candles absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-              <input type="number" id="editWearerAge" placeholder="68" min="1" max="130" class="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition">
+              <i class="fa-solid fa-cake-candles absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="number" id="editWearerAge" placeholder="68" min="1" max="130" class="w-full pl-7 pr-1 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition">
             </div>
           </div>
           <div>
             <label class="block font-bold text-slate-700 mb-1">Giới tính</label>
-            <select id="editWearerGender" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition">
+            <select id="editWearerGender" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition">
               <option value="Nam">Nam</option>
               <option value="Nữ">Nữ</option>
               <option value="Khác">Khác</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Nhóm máu</label>
+            <select id="editWearerBlood" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition">
+              <option value="Chưa rõ">Chưa rõ</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
             </select>
           </div>
         </div>
@@ -771,27 +804,45 @@
         <p class="text-[10px] text-slate-500">Nhập tọa độ nhà thật. Địa chỉ chữ không tự xác định được tâm vùng an toàn.</p>
         <button type="button" onclick="useKitGpsForHome()" class="text-[11px] font-bold text-blue-700 underline">Dùng vị trí GPS hiện tại của kit làm tâm nhà</button>
 
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">Tiền sử y tế & Bệnh nền</label>
-          <div class="relative">
-            <i class="fa-solid fa-notes-medical absolute left-3.5 top-2.5 text-slate-400 text-xs"></i>
-            <textarea id="editWearerMedical" rows="2" placeholder="Ví dụ: Huyết áp cao, cần đo nhịp tim & vận động định kỳ" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"></textarea>
+        <!-- Tiền sử y tế & Bệnh nền -->
+        <div class="space-y-1 block clear-both">
+          <label class="block font-bold text-slate-700 text-xs">Tiền sử y tế & Bệnh nền</label>
+          <div class="relative w-full block">
+            <i class="fa-solid fa-notes-medical absolute left-3.5 top-3 text-slate-400 text-xs pointer-events-none"></i>
+            <textarea id="editWearerMedical" rows="2" placeholder="Ví dụ: Huyết áp cao, tiểu đường type 2..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white resize-none block leading-relaxed transition"></textarea>
           </div>
         </div>
 
-        <div class="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-2">
-          <p class="font-bold text-blue-900 text-[11px] flex items-center gap-1.5">
-            <i class="fa-solid fa-shield-halved text-blue-600"></i>
-            <span>Người Liên Hệ Khẩn Cấp (Nhận tin báo té ngã)</span>
-          </p>
-          <div class="grid grid-cols-1 gap-2">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Họ tên & Mối quan hệ</label>
-              <input type="text" id="editWearerContactName" placeholder="Ví dụ: Tên con cái / người thân" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 transition">
+        <!-- Dị ứng thuốc & Chống chỉ định cấp cứu -->
+        <div class="space-y-1 block clear-both pt-1">
+          <label class="block font-bold text-rose-800 text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600 text-xs"></i>
+            <span>Dị ứng thuốc & Chống chỉ định cấp cứu</span>
+          </label>
+          <div class="relative w-full block">
+            <textarea id="editWearerAllergies" rows="2" placeholder="Ví dụ: Dị ứng kháng sinh Penicillin, Aspirin... hoặc 'Không có'" class="w-full px-3 py-2 bg-rose-50/40 border border-rose-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-rose-500 focus:bg-white resize-none block leading-relaxed transition"></textarea>
+          </div>
+        </div>
+
+        <!-- Người Liên Hệ Khẩn Cấp -->
+        <div class="mt-4 p-3.5 bg-blue-50/90 border border-blue-200 rounded-2xl space-y-2.5 block clear-both shadow-2xs">
+          <div class="flex items-center gap-2 pb-1 border-b border-blue-200/70">
+            <div class="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-phone-volume"></i>
             </div>
             <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Số điện thoại</label>
-              <input type="tel" id="editWearerContactPhone" placeholder="Ví dụ: 0912.345.678" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 transition">
+              <p class="font-extrabold text-blue-950 text-xs leading-tight">Người Liên Hệ Khẩn Cấp</p>
+              <p class="text-[10px] text-blue-700/90 font-medium">Nhận tin báo té ngã & hiển thị ưu tiên trên QR cấp cứu</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-2 pt-0.5">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 mb-1">Họ tên & Mối quan hệ</label>
+              <input type="text" id="editWearerContactName" placeholder="Ví dụ: Anh Nam (Con trai)" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 block transition">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 mb-1">Số điện thoại khẩn cấp</label>
+              <input type="tel" id="editWearerContactPhone" placeholder="Ví dụ: 0912.345.678" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 block transition">
             </div>
           </div>
         </div>
@@ -807,6 +858,49 @@
         <button onclick="closeWearerSettingsModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
           Hủy bỏ
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CẤU HÌNH IP MÁY CHỦ KHI ĐỔI MẠNG WIFI -->
+  <div id="serverConfigModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden animate-in fade-in duration-200">
+    <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 p-5 space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-network-wired"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-sm">Cấu Hình IP Máy Chủ</h3>
+            <p class="text-[10px] text-slate-500 font-medium">Thay đổi linh hoạt khi chuyển mạng Wi-Fi</p>
+          </div>
+        </div>
+        <button onclick="closeServerConfigModal()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Địa chỉ IP Máy tính Backend (Cổng 8787)</label>
+          <div class="relative">
+            <i class="fa-solid fa-link absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="configBackendUrlInput" placeholder="http://172.11.103.28:8787" class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition">
+          </div>
+          <p class="text-[10px] text-slate-500 mt-1">Mẹo: Mở terminal trên máy tính gõ <code class="font-mono bg-slate-100 px-1 rounded font-bold">ipconfig</code> để xem IPv4 của mạng Wi-Fi hiện tại.</p>
+        </div>
+
+        <div id="serverConfigStatus" class="text-[11px] p-2.5 rounded-xl hidden"></div>
+
+        <div class="flex gap-2 pt-1">
+          <button onclick="applyServerConfig()" class="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-xl text-xs shadow-md shadow-blue-600/25 active:scale-95 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-check text-xs"></i>
+            <span>Kết Nối & Cập Nhật QR Vòng Tay</span>
+          </button>
+          <button onclick="closeServerConfigModal()" class="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">
+            Đóng
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1323,12 +1417,44 @@
       name: '',
       age: '',
       gender: 'Nam',
+      bloodGroup: 'Chưa rõ',
       hometown: '',
-      currentAddress: localStorage.getItem('tantam_home_address') || 'Nhà văn hóa thôn Phú Thứ B',
+      currentAddress: localStorage.getItem('tantam_home_address') || '',
       medicalNotes: '',
+      allergies: '',
       emergencyContact: '',
       emergencyPhone: ''
     };
+    if (wearerProfile) {
+      if (!wearerProfile.bloodGroup) wearerProfile.bloodGroup = 'Chưa rõ';
+      if (!wearerProfile.allergies) wearerProfile.allergies = '';
+    }
+
+    function removeVietnameseTones(str) {
+      if (!str) return '';
+      return str
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .trim();
+    }
+
+    function generateVictimQrText(profile) {
+      if (!profile) return 'THONG TIN NAN NHAN\nHo ten: Nguoi deo\nNhom mau: --\nBenh ly: Can cap cuu\nLH: 115';
+      const name = removeVietnameseTones(profile.name || 'Nguoi deo');
+      const age = profile.age ? ` (${profile.age}t)` : '';
+      let blood = removeVietnameseTones(profile.bloodGroup || '--').toUpperCase();
+      if (blood.includes('CHUA') || blood === '') blood = '--';
+      const cond = removeVietnameseTones(profile.medicalNotes || 'Khong co');
+      const allergies = removeVietnameseTones(profile.allergies || 'Khong co');
+      const phone = (profile.emergencyPhone || '115').replace(/[^0-9]/g, '');
+      const contact = removeVietnameseTones(profile.emergencyContact || '');
+      const contactStr = contact ? ` (${contact})` : '';
+
+      return `THONG TIN NAN NHAN\nHo ten: ${name}${age}\nNhom mau: ${blood}\nBenh ly: ${cond}\nDi ung: ${allergies}\nLH: ${phone}${contactStr}`;
+    }
 
     // Home Location & Geofence State (Liên kết trực tiếp với hồ sơ người đeo tại nơi ở hiện tại)
     let initialHomeAddr = (wearerProfile && wearerProfile.currentAddress) || localStorage.getItem('tantam_home_address') || 'Nhà văn hóa thôn Phú Thứ B';
@@ -1384,11 +1510,13 @@
       document.getElementById('editWearerName').value = isConf ? (wearerProfile.name || '') : '';
       document.getElementById('editWearerAge').value = isConf ? (wearerProfile.age || '') : '';
       document.getElementById('editWearerGender').value = isConf ? (wearerProfile.gender || 'Nam') : 'Nam';
+      document.getElementById('editWearerBlood').value = isConf ? (wearerProfile.bloodGroup || 'Chưa rõ') : 'Chưa rõ';
       document.getElementById('editWearerHometown').value = isConf ? (wearerProfile.hometown || '') : '';
       document.getElementById('editWearerAddress').value = isConf ? (wearerProfile.currentAddress || '') : '';
       document.getElementById('editWearerLat').value = localStorage.getItem('tantam_home_verified') === '1' ? homeLocation.lat : '';
       document.getElementById('editWearerLng').value = localStorage.getItem('tantam_home_verified') === '1' ? homeLocation.lng : '';
       document.getElementById('editWearerMedical').value = isConf ? (wearerProfile.medicalNotes || '') : '';
+      document.getElementById('editWearerAllergies').value = isConf ? (wearerProfile.allergies || '') : '';
       
       // Auto-populate child's name from registration if available, otherwise empty!
       const registeredName = currentAccount.name || localStorage.getItem('tantam_reg_name') || document.getElementById('regName')?.value?.trim() || '';
@@ -1435,19 +1563,25 @@
       const name = document.getElementById('editWearerName').value.trim();
       const age = document.getElementById('editWearerAge').value.trim();
       const gender = document.getElementById('editWearerGender').value;
+      const bloodGroup = document.getElementById('editWearerBlood').value;
       const hometown = document.getElementById('editWearerHometown').value.trim();
       const address = document.getElementById('editWearerAddress').value.trim();
       const homeLat = Number(document.getElementById('editWearerLat').value);
       const homeLng = Number(document.getElementById('editWearerLng').value);
       const medical = document.getElementById('editWearerMedical').value.trim();
+      const allergies = document.getElementById('editWearerAllergies').value.trim();
       const contactName = document.getElementById('editWearerContactName').value.trim();
       const contactPhone = document.getElementById('editWearerContactPhone').value.trim();
       const statusMsg = document.getElementById('wearerSettingsStatusMsg');
 
-      if (!name || !age || !hometown || !address || !Number.isFinite(homeLat) || !Number.isFinite(homeLng) ||
-          Math.abs(homeLat) > 90 || Math.abs(homeLng) > 180 || (homeLat === 0 && homeLng === 0)) {
+      let latVal = homeLat;
+      let lngVal = homeLng;
+      if (!Number.isFinite(latVal) || latVal === 0) latVal = homeLocation.lat || 20.98108;
+      if (!Number.isFinite(lngVal) || lngVal === 0) lngVal = homeLocation.lng || 105.78736;
+
+      if (!name || !age) {
         statusMsg.className = 'text-[11px] p-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 block';
-        statusMsg.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Điền tên, tuổi, quê quán, địa chỉ và tọa độ nhà hợp lệ.';
+        statusMsg.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Vui lòng điền họ tên và tuổi người đeo.';
         return;
       }
 
@@ -1455,19 +1589,21 @@
       wearerProfile.name = name;
       wearerProfile.age = parseInt(age, 10) || age;
       wearerProfile.gender = gender;
+      wearerProfile.bloodGroup = bloodGroup;
       wearerProfile.hometown = hometown;
       wearerProfile.currentAddress = address;
       wearerProfile.medicalNotes = medical;
+      wearerProfile.allergies = allergies;
       wearerProfile.emergencyContact = contactName;
       wearerProfile.emergencyPhone = contactPhone;
 
       if (address) {
         homeLocation.address = address;
-        homeLocation.lat = homeLat;
-        homeLocation.lng = homeLng;
+        homeLocation.lat = latVal;
+        homeLocation.lng = lngVal;
         localStorage.setItem('tantam_home_address', address);
-        localStorage.setItem('tantam_home_lat', homeLat);
-        localStorage.setItem('tantam_home_lng', homeLng);
+        localStorage.setItem('tantam_home_lat', latVal);
+        localStorage.setItem('tantam_home_lng', lngVal);
         localStorage.setItem('tantam_home_verified', '1');
       }
 
@@ -1475,6 +1611,41 @@
         localStorage.setItem('tantam_wearer_profile', JSON.stringify(wearerProfile));
         backendAuth('profile', {profile:wearerProfile}, localStorage.getItem('tantam_auth_token'))
           .catch(error => showToast(`Chưa lưu hồ sơ lên backend: ${error.message}`));
+
+        const bUrl = getBackendBaseUrl();
+        fetch(`${bUrl}/api/v1/patient/smartband-001`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(wearerProfile)
+        }).catch(err => console.warn('Sync patient endpoint failed:', err));
+
+        // Tạo chuỗi QR Thông tin nạn nhân (quét ra text trực tiếp, không vào danh bạ)
+        const cleanName = removeVietnameseTones(wearerProfile.name || 'Nguoi deo');
+        const cleanPhone = (contactPhone || '115').replace(/[^0-9]/g, '');
+        let cleanBlood = removeVietnameseTones(bloodGroup || '--').toUpperCase();
+        if (cleanBlood.includes('CHUA') || cleanBlood === '') cleanBlood = '--';
+        const cleanCond = removeVietnameseTones(medical || 'CAP CUU').substring(0, 14);
+        const plainVictimQr = generateVictimQrText(wearerProfile);
+
+        if (window.NativeBridge) {
+          if (typeof window.NativeBridge.provisionMedicalProfile === 'function') {
+            window.NativeBridge.provisionMedicalProfile(
+              cleanBlood,
+              cleanCond,
+              cleanPhone,
+              plainVictimQr,
+              cleanName
+            );
+          } else if (typeof window.NativeBridge.provisionMedical === 'function') {
+            window.NativeBridge.provisionMedical(
+              cleanBlood,
+              cleanCond,
+              cleanPhone,
+              plainVictimQr
+            );
+          }
+        }
+
         if (contactPhone) {
           localStorage.setItem('tantam_reg_phone', contactPhone);
           currentAccount.phone = contactPhone;
@@ -2870,12 +3041,90 @@
       if (content) content.scrollTop = 0;
     }
 
-    // Default to this computer's current LAN address so a phone on the same Wi-Fi
-    // can reach the backend. The profile field still allows changing it later.
-    const savedBackendUrl = localStorage.getItem('smartband_backend_url');
-    let SMARTBAND_BACKEND = savedBackendUrl || 'http://192.168.100.247:8787';
+    function getBackendBaseUrl() {
+      const saved = localStorage.getItem('smartband_backend_url');
+      if (saved && saved.trim() && !saved.includes('192.168.0.101') && !saved.includes('192.168.0.102')) {
+        return saved.trim().replace(/\/+$/, '');
+      }
+      return 'http://172.11.103.28:8787';
+    }
+
+    let SMARTBAND_BACKEND = getBackendBaseUrl();
     window.NativeBridge?.setBackendUrl?.(SMARTBAND_BACKEND);
-    document.getElementById('authBackendUrlInput').value = SMARTBAND_BACKEND;
+    const authInput = document.getElementById('authBackendUrlInput');
+    if (authInput) authInput.value = SMARTBAND_BACKEND;
+
+    function openServerConfigModal() {
+      const input = document.getElementById('configBackendUrlInput');
+      if (input) input.value = getBackendBaseUrl();
+      const status = document.getElementById('serverConfigStatus');
+      if (status) status.className = 'hidden';
+      document.getElementById('serverConfigModal')?.classList.remove('hidden');
+    }
+
+    function closeServerConfigModal() {
+      document.getElementById('serverConfigModal')?.classList.add('hidden');
+    }
+
+    async function applyServerConfig() {
+      const input = document.getElementById('configBackendUrlInput');
+      const status = document.getElementById('serverConfigStatus');
+      let url = (input.value || '').trim().replace(/\/+$/, '');
+      if (!url) url = 'http://172.11.103.28:8787';
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'http://' + url;
+      }
+      if (!url.includes(':', 7)) {
+        url += ':8787';
+      }
+      input.value = url;
+      status.className = 'text-[11px] p-2.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 block';
+      status.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang kết nối ' + url + '...';
+
+      try {
+        const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        localStorage.setItem('smartband_backend_url', url);
+        SMARTBAND_BACKEND = url;
+        window.NativeBridge?.setBackendUrl?.(url);
+        status.className = 'text-[11px] p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 block';
+        status.innerHTML = '✅ Kết nối thành công! Đang lưu & cập nhật mã QR vòng tay...';
+
+        if (window.NativeBridge) {
+          const cleanName = removeVietnameseTones(wearerProfile.name || 'Nguoi deo');
+          const cleanPhone = (wearerProfile.emergencyPhone || '115').replace(/[^0-9]/g, '');
+          let cleanBlood = removeVietnameseTones(wearerProfile.bloodGroup || '--').toUpperCase();
+          if (cleanBlood.includes('CHUA') || cleanBlood === '') cleanBlood = '--';
+          const cleanCond = removeVietnameseTones(wearerProfile.medicalNotes || 'CAP CUU').substring(0, 14);
+          const plainVictimQr = generateVictimQrText(wearerProfile);
+          if (typeof window.NativeBridge.provisionMedicalProfile === 'function') {
+            window.NativeBridge.provisionMedicalProfile(
+              cleanBlood,
+              cleanCond,
+              cleanPhone,
+              plainVictimQr,
+              cleanName
+            );
+          } else if (typeof window.NativeBridge.provisionMedical === 'function') {
+            window.NativeBridge.provisionMedical(
+              cleanBlood,
+              cleanCond,
+              cleanPhone,
+              plainVictimQr
+            );
+          }
+        }
+
+        setTimeout(() => {
+          closeServerConfigModal();
+          renderMainTabContent();
+          showToast(`✅ Đã kết nối máy chủ: ${url}`);
+        }, 600);
+      } catch (err) {
+        status.className = 'text-[11px] p-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 block';
+        status.innerHTML = `❌ Không kết nối được tới ${url}. Vui lòng kiểm tra điện thoại và máy tính cùng kết nối Wi-Fi, và backend đang chạy.`;
+      }
+    }
     async function backendAuth(path, data, token = '') {
       if (!SMARTBAND_BACKEND) throw new Error('Hãy kết nối backend trước.');
       const controller = new AbortController();
@@ -2926,7 +3175,7 @@
         const previous = localStorage.getItem('smartband_last_alert');
         localStorage.setItem('smartband_last_alert', id);
         const age = Date.now() - Date.parse(last.received_at);
-        if (previous !== id && age >= 0 && age < 30000) {
+        if (previous !== id && (age >= -60000 && age < 180000)) {
           triggerFallAlarm(last.alert_type === 'SOS' ? 'SOS' : 'FALL');
           if (currentTab === 'alerts') loadRealAlerts();
         }
@@ -3005,14 +3254,28 @@
         setText('kitCurrentSsid', fresh ? (latest.wifi_ssid || 'Wi-Fi') : 'Offline');
         if (gps.valid && fresh && localStorage.getItem('tantam_home_verified') === '1') {
           const distance = Math.round(calculateGpsDistanceMeters(Number(gps.lat), Number(gps.lon), homeLocation.lat, homeLocation.lng));
-          setText('kitSafeZone', distance <= (homeLocation.radius || 250) ? 'Trong vùng an toàn' : 'Ngoài vùng an toàn');
+          const isOutside = distance > (homeLocation.radius || 250);
+          setText('kitSafeZone', !isOutside ? 'Trong vùng an toàn' : 'Ngoài vùng an toàn');
           setText('kitSafeDetail', `Cách nhà ${distance} m`);
           const zone = document.getElementById('kitSafeZone');
-          if (zone) zone.className = distance <= (homeLocation.radius || 250) ? 'text-emerald-700' : 'text-rose-600';
+          if (zone) zone.className = !isOutside ? 'text-emerald-700 font-bold' : 'text-rose-600 font-black animate-pulse';
+
+          const geoBanner = document.getElementById('geofenceWarningBanner');
+          if (geoBanner) {
+            if (isOutside) {
+              geoBanner.classList.remove('hidden');
+              const distEl = document.getElementById('geofenceBannerDistance');
+              if (distEl) distEl.textContent = `${distance} mét`;
+            } else {
+              geoBanner.classList.add('hidden');
+            }
+          }
         }
         if (!fresh || localStorage.getItem('tantam_home_verified') !== '1') {
           setText('kitSafeZone', 'Chưa xác định');
           setText('kitSafeDetail', fresh ? 'Cài tọa độ nhà trong Hồ sơ' : 'Kit đang offline');
+          const geoBanner = document.getElementById('geofenceWarningBanner');
+          if (geoBanner) geoBanner.classList.add('hidden');
         }
         recordAiSample(latest, fresh);
         if (currentTab === 'dashboard' && Date.now() - lastStopLogRefresh >= 10000) {
@@ -3216,6 +3479,41 @@
               <iframe id="kitMap" title="Vị trí GPS của Smartband" class="w-full h-full border-0" loading="lazy"></iframe>
             </div>
             <p id="kitUpdatedAt" class="text-[9px] text-slate-500">Đang tải thời điểm cập nhật...</p>
+          </div>
+
+          <!-- Thẻ Hồ Sơ Bệnh Án & Mã QR Y Tế Cứu Hộ -->
+          <div class="p-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-2xl shadow-2xs space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-black text-red-900 flex items-center gap-1.5 text-[11px]">
+                <i class="fa-solid fa-qrcode text-red-600 text-sm"></i>
+                <span>HỒ SƠ BỆNH ÁN & MÃ QR CỨU HỘ</span>
+              </span>
+              <span class="px-2 py-0.5 bg-red-600 text-white font-extrabold text-[9px] rounded-full shadow-2xs">
+                ${wearerProfile.isConfigured ? `NHÓM MÁU: ${wearerProfile.bloodGroup || 'Chưa rõ'}` : 'CHƯA CÀI ĐẶT'}
+              </span>
+            </div>
+            
+            <div class="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-red-100">
+              <div class="w-14 h-14 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center shrink-0 shadow-2xs">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(generateVictimQrText(wearerProfile))}" alt="QR Thông tin nạn nhân" class="w-full h-full object-contain">
+              </div>
+              <div class="text-[11px] min-w-0 flex-1 space-y-0.5">
+                ${wearerProfile.isConfigured ? `
+                  <p class="font-black text-slate-900 truncate">${wearerProfile.name} (${wearerProfile.age} tuổi)</p>
+                  <p class="text-slate-600 text-[10px] truncate"><span class="font-bold text-red-700">Bệnh nền:</span> ${wearerProfile.medicalNotes || 'Không có'}</p>
+                  <p class="text-slate-600 text-[10px] truncate"><span class="font-bold text-rose-700">Dị ứng:</span> ${wearerProfile.allergies || 'Không có'}</p>
+                  <span class="inline-flex items-center text-[9px] font-extrabold text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 mt-0.5">
+                    <i class="fa-solid fa-notes-medical mr-1 text-[8px]"></i> QR Thông tin nạn nhân (Quét xem trực tiếp)
+                  </span>
+                ` : `
+                  <p class="font-bold text-amber-900 truncate text-[11px]">Chưa cài đặt hồ sơ người đeo</p>
+                  <p class="text-slate-500 text-[10px] line-clamp-1">Điền nhóm máu, bệnh nền để kích hoạt thẻ cấp cứu.</p>
+                  <button onclick="openWearerSettingsModal()" class="mt-1 text-[10px] font-black text-blue-600 hover:underline flex items-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-pen-to-square text-[9px]"></i> Cài đặt hồ sơ ngay
+                  </button>
+                `}
+              </div>
+            </div>
           </div>
 
           <!-- 3. Cảnh Báo Gần Nhất -->
@@ -4015,64 +4313,90 @@
               </div>
             ` : ''}
 
-            <!-- Main attributes: Name, Age, Gender, Hometown -->
-            <div class="grid grid-cols-2 gap-2 text-[11px]">
-              <div class="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                <span class="text-[10px] font-semibold text-slate-400 block mb-0.5"><i class="fa-solid fa-user mr-1 text-blue-600"></i> Họ và tên cụ</span>
-                <span class="font-extrabold ${wearerProfile.isConfigured && wearerProfile.name ? 'text-slate-900' : 'text-slate-400 italic'}">
-                  ${wearerProfile.isConfigured && wearerProfile.name ? wearerProfile.name : '(Chưa cài đặt)'}
+            <!-- Main attributes: Name, Age, Gender, Blood -->
+            <div class="grid grid-cols-3 gap-2 text-[11px]">
+              <div class="p-2 bg-slate-50 rounded-xl border border-slate-100 col-span-1">
+                <span class="text-[10px] font-semibold text-slate-400 block mb-0.5"><i class="fa-solid fa-user mr-1 text-blue-600"></i> Họ và tên</span>
+                <span class="font-extrabold ${wearerProfile.isConfigured && wearerProfile.name ? 'text-slate-900' : 'text-slate-400 italic'} truncate block">
+                  ${wearerProfile.isConfigured && wearerProfile.name ? wearerProfile.name : '(Chưa cài)'}
                 </span>
               </div>
-              <div class="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                <span class="text-[10px] font-semibold text-slate-400 block mb-0.5"><i class="fa-solid fa-cake-candles mr-1 text-rose-500"></i> Tuổi tác</span>
-                <span class="font-extrabold ${wearerProfile.isConfigured && wearerProfile.age ? 'text-slate-900' : 'text-slate-400 italic'}">
-                  ${wearerProfile.isConfigured && wearerProfile.age ? `${wearerProfile.age} tuổi (${wearerProfile.gender})` : '(Chưa có)'}
+              <div class="p-2 bg-slate-50 rounded-xl border border-slate-100 col-span-1">
+                <span class="text-[10px] font-semibold text-slate-400 block mb-0.5"><i class="fa-solid fa-cake-candles mr-1 text-rose-500"></i> Tuổi / Giới</span>
+                <span class="font-extrabold ${wearerProfile.isConfigured && wearerProfile.age ? 'text-slate-900' : 'text-slate-400 italic'} truncate block">
+                  ${wearerProfile.isConfigured && wearerProfile.age ? `${wearerProfile.age}t (${wearerProfile.gender})` : '(Chưa có)'}
+                </span>
+              </div>
+              <div class="p-2 bg-red-50 rounded-xl border border-red-100 col-span-1">
+                <span class="text-[10px] font-semibold text-red-500 block mb-0.5"><i class="fa-solid fa-droplet mr-1 text-red-600"></i> Nhóm máu</span>
+                <span class="font-black ${wearerProfile.isConfigured && wearerProfile.bloodGroup ? 'text-red-700' : 'text-slate-400 italic'} truncate block">
+                  ${wearerProfile.isConfigured && wearerProfile.bloodGroup ? wearerProfile.bloodGroup : 'Chưa rõ'}
                 </span>
               </div>
             </div>
 
             <!-- Detailed information -->
-            <div class="space-y-1.5 text-[11px]">
-              <div class="p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-2">
-                <i class="fa-solid fa-map-location-dot text-rose-500 mt-0.5 text-xs"></i>
-                <div class="flex-1">
-                  <span class="text-[10px] font-semibold text-slate-400 block">Quê quán</span>
-                  <span class="font-bold ${wearerProfile.isConfigured && wearerProfile.hometown ? 'text-slate-800' : 'text-slate-400 italic'}">
+            <div class="space-y-2.5 text-xs">
+              <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-start gap-2.5 w-full">
+                <div class="w-6 h-6 rounded-lg bg-slate-100 text-rose-500 flex items-center justify-center shrink-0 mt-0.5">
+                  <i class="fa-solid fa-map-location-dot text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-0.5">Quê quán</span>
+                  <p class="font-bold text-xs break-words leading-relaxed ${wearerProfile.isConfigured && wearerProfile.hometown ? 'text-slate-800' : 'text-slate-400 italic'}">
                     ${wearerProfile.isConfigured && wearerProfile.hometown ? wearerProfile.hometown : '(Chưa cài đặt)'}
-                  </span>
+                  </p>
                 </div>
               </div>
 
-              <div class="p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-2">
-                <i class="fa-solid fa-house-chimney text-blue-500 mt-0.5 text-xs"></i>
-                <div class="flex-1">
-                  <span class="text-[10px] font-semibold text-slate-400 block">Nơi ở hiện tại</span>
-                  <span class="font-bold ${wearerProfile.isConfigured && wearerProfile.currentAddress ? 'text-slate-800' : 'text-slate-400 italic'}">
+              <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-start gap-2.5 w-full">
+                <div class="w-6 h-6 rounded-lg bg-slate-100 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                  <i class="fa-solid fa-house-chimney text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-0.5">Nơi ở hiện tại</span>
+                  <p class="font-bold text-xs break-words leading-relaxed ${wearerProfile.isConfigured && wearerProfile.currentAddress ? 'text-slate-800' : 'text-slate-400 italic'}">
                     ${wearerProfile.isConfigured && wearerProfile.currentAddress ? wearerProfile.currentAddress : '(Chưa cài đặt)'}
-                  </span>
+                  </p>
                 </div>
               </div>
 
-              <div class="p-2 bg-amber-50/70 rounded-xl border border-amber-200/70 flex items-start gap-2">
-                <i class="fa-solid fa-notes-medical text-amber-600 mt-0.5 text-xs"></i>
-                <div class="flex-1">
-                  <span class="text-[10px] font-semibold text-amber-800 block">Tiền sử y tế & Bệnh nền</span>
-                  <span class="font-bold ${wearerProfile.isConfigured && wearerProfile.medicalNotes ? 'text-slate-800' : 'text-slate-400 italic'}">
+              <div class="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200/80 flex items-start gap-2.5 w-full">
+                <div class="w-6 h-6 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <i class="fa-solid fa-notes-medical text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wide block mb-0.5">Tiền sử y tế & Bệnh nền</span>
+                  <p class="font-bold text-xs break-words leading-relaxed ${wearerProfile.isConfigured && wearerProfile.medicalNotes ? 'text-slate-800' : 'text-slate-400 italic'}">
                     ${wearerProfile.isConfigured && wearerProfile.medicalNotes ? wearerProfile.medicalNotes : '(Chưa cài đặt)'}
-                  </span>
+                  </p>
                 </div>
               </div>
 
-              <div class="p-2 bg-emerald-50/70 rounded-xl border border-emerald-200/70 flex items-start gap-2">
-                <i class="fa-solid fa-phone-volume text-emerald-600 mt-0.5 text-xs"></i>
-                <div class="flex-1">
-                  <span class="text-[10px] font-semibold text-emerald-800 block">Người liên hệ khẩn cấp (Con cái)</span>
-                  <span class="font-bold text-slate-900">
+              <div class="p-2.5 bg-rose-50/80 rounded-xl border border-rose-200/90 flex items-start gap-2.5 w-full block clear-both">
+                <div class="w-6 h-6 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="text-[10px] font-extrabold text-rose-800 uppercase tracking-wide block mb-0.5">Dị ứng thuốc & Chống chỉ định</span>
+                  <p class="font-bold text-xs break-words leading-relaxed ${wearerProfile.isConfigured && wearerProfile.allergies ? 'text-rose-950' : 'text-slate-400 italic'}">
+                    ${wearerProfile.isConfigured && wearerProfile.allergies ? wearerProfile.allergies : '(Chưa ghi nhận / Chưa cài đặt)'}
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-2.5 bg-emerald-50/80 rounded-xl border border-emerald-200/90 flex items-start gap-2.5 w-full block clear-both">
+                <div class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <i class="fa-solid fa-phone-volume text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wide block mb-0.5">Người liên hệ khẩn cấp (Con cái / Người thân)</span>
+                  <p class="font-bold text-xs text-slate-900 break-words leading-relaxed">
                     ${wearerProfile.isConfigured && wearerProfile.emergencyContact 
                       ? wearerProfile.emergencyContact 
                       : (currentAccount.name ? `${currentAccount.name} (Con cái)` : '<span class="text-slate-400 italic">Chưa thiết lập</span>')}
-                    ${(wearerProfile.emergencyPhone || currentAccount.phone) ? ` • <span class="text-blue-700 font-extrabold">${wearerProfile.emergencyPhone || currentAccount.phone}</span>` : ''}
-                  </span>
+                    ${(wearerProfile.emergencyPhone || currentAccount.phone) ? ` • <span class="text-blue-700 font-black">${wearerProfile.emergencyPhone || currentAccount.phone}</span>` : ''}
+                  </p>
                 </div>
               </div>
             </div>
@@ -4157,6 +4481,11 @@
       alarmSnoozed = false;
       isEmergency = true;
       document.getElementById('emergencyBanner')?.classList.remove('hidden');
+
+      // Kích hoạt còi báo động khẩn cấp & cưỡng bức âm lượng cực đại trên Android Native
+      try {
+        window.NativeBridge?.playEmergencyAlarm?.();
+      } catch(e) {}
 
       // Phát tiếng chuông báo ngân vang định kỳ 850ms + rung điện thoại
       playAlarmBuzzerSound();
@@ -4912,10 +5241,10 @@
     }
 
     async function fetchGeminiAdvice(promptText) {
-      const wearerName = (wearerProfile && wearerProfile.name) || 'Cụ Lê Văn Hân';
-      const wearerAge = (wearerProfile && wearerProfile.age) ? `${wearerProfile.age} tuổi` : '82 tuổi';
-      const wearerGender = (wearerProfile && wearerProfile.gender) || 'Nam';
-      const wearerMedical = (wearerProfile && wearerProfile.medicalNotes) || 'Huyết áp cao độ 1, tiền sử thoái hóa khớp gối, hay chóng mặt tư thế';
+      const wearerName = (wearerProfile && wearerProfile.name) || 'Người đeo thiết bị';
+      const wearerAge = (wearerProfile && wearerProfile.age) ? `${wearerProfile.age} tuổi` : 'chưa cài đặt tuổi';
+      const wearerGender = (wearerProfile && wearerProfile.gender) || 'chưa rõ';
+      const wearerMedical = (wearerProfile && wearerProfile.medicalNotes) || 'chưa ghi nhận tiền sử bệnh đặc biệt';
       const cleanPrompt = promptText ? promptText.trim() : '';
       if (!cleanPrompt) return 'Dạ bạn hãy nhập câu hỏi để Trợ lý AI tư vấn nhé!';
 
@@ -5102,6 +5431,23 @@ Bạn là một AI chatbot thực thụ và đa năng, phản hồi CỰC KỲ N
         });
       }
     } catch (e) {}
+    // Nhận thông báo kích hoạt khẩn cấp trực tiếp từ Native Android (khi bung toàn màn hình khóa)
+    window.onNativeEmergencyAlert = function(kind) {
+      console.log('[Native Emergency Alert]', kind);
+      setMainTab('tracking');
+      const banner = document.getElementById('emergencyBanner');
+      if (banner) {
+        banner.classList.remove('hidden');
+        const textEl = document.getElementById('emergencyBannerText');
+        if (textEl) {
+          textEl.textContent = kind === 'SOS' 
+            ? '🚨 BÁO ĐỘNG SOS TỪ THIẾT BỊ' 
+            : '⚠️ PHÁT HIỆN TAI NẠN TÉ NGÃ!';
+        }
+      }
+      playEmergencyAlarmSound();
+      showToast(`🚨 KHẨN CẤP: ${kind === 'SOS' ? 'Nút SOS được bấm!' : 'Phát hiện người thân té ngã!'}`);
+    };
   </script>
 </body>
 </html>

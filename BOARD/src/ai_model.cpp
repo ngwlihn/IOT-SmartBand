@@ -197,16 +197,16 @@ AiPrediction AiModel::inferWithGeneratedWeights(const AiFeatures& features) {
 }
 
 AiPrediction AiModel::inferWithBaselineModel(const AiFeatures& features) {
-  const float impactEvidence = SignalProcessing::mapToScore(features.values[FEATURE_ACC_PEAK_LINEAR], 0.6f, 3.2f);
-  const float rotationEvidence = SignalProcessing::mapToScore(features.values[FEATURE_GYRO_PEAK], 180.0f, 900.0f);
-  const float orientationEvidence = SignalProcessing::mapToScore(features.values[FEATURE_ORIENTATION_DELTA], 20.0f, 90.0f);
+  const float impactEvidence = SignalProcessing::mapToScore(features.values[FEATURE_ACC_PEAK_LINEAR], 0.8f, 3.2f);
+  const float rotationEvidence = SignalProcessing::mapToScore(features.values[FEATURE_GYRO_PEAK], 200.0f, 900.0f);
+  const float orientationEvidence = SignalProcessing::mapToScore(features.values[FEATURE_ORIENTATION_DELTA], 25.0f, 90.0f);
   const float inactivityEvidence = SignalProcessing::clamp01(features.values[FEATURE_INACTIVITY_RATIO]);
-  const float jerkEvidence = SignalProcessing::mapToScore(features.values[FEATURE_JERK_PEAK], 15.0f, 90.0f);
+  const float jerkEvidence = SignalProcessing::mapToScore(features.values[FEATURE_JERK_PEAK], 20.0f, 90.0f);
 
   AiPrediction prediction;
-  prediction.normal = 2.0f - (2.0f * impactEvidence) - (0.6f * rotationEvidence);
-  prediction.impact = -0.2f + (2.0f * impactEvidence) + (0.9f * rotationEvidence) + (0.4f * jerkEvidence) - (0.7f * inactivityEvidence);
-  prediction.crash = -1.2f + (1.4f * impactEvidence) + (1.0f * rotationEvidence) + (0.8f * orientationEvidence) + (0.9f * inactivityEvidence);
+  prediction.normal = 2.0f - (2.2f * impactEvidence) - (0.6f * rotationEvidence);
+  prediction.impact = -0.3f + (2.6f * impactEvidence) + (0.6f * jerkEvidence) - (1.2f * orientationEvidence);
+  prediction.crash = -1.5f + (1.2f * impactEvidence) + (1.5f * orientationEvidence) + (0.8f * inactivityEvidence);
   softmax3(prediction.normal, prediction.impact, prediction.crash);
   prediction.predictedClass = classFromProbabilities(prediction.normal, prediction.impact, prediction.crash);
   return prediction;

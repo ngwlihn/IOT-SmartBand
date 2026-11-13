@@ -8,7 +8,8 @@ constexpr uint32_t DEBOUNCE_MS = 40;
 
 void ButtonManager::begin() {
   pinMode(Config::BUTTON_PIN, INPUT_PULLUP);
-  const bool pressed = digitalRead(Config::BUTTON_PIN) == LOW;
+  pinMode(0, INPUT_PULLUP);
+  const bool pressed = (digitalRead(Config::BUTTON_PIN) == LOW) || (digitalRead(0) == LOW);
   stablePressed_ = pressed;
   lastReading_ = pressed;
   pressedEvent_ = false;
@@ -18,7 +19,7 @@ void ButtonManager::begin() {
 }
 
 void ButtonManager::update(uint32_t nowMs) {
-  const bool reading = digitalRead(Config::BUTTON_PIN) == LOW;
+  const bool reading = (digitalRead(Config::BUTTON_PIN) == LOW) || (digitalRead(0) == LOW);
   if (reading != lastReading_) {
     lastReading_ = reading;
     lastChangeMs_ = nowMs;

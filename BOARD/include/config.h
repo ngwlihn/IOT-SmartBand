@@ -45,19 +45,20 @@ constexpr uint32_t WEATHER_REFRESH_MS = 900000;
 constexpr uint32_t WIFI_RETRY_MS = 30000;
 constexpr uint32_t TELEMETRY_INTERVAL_MS = 2000;
 
-constexpr uint32_t CONFIRMATION_TIMEOUT_MS = 15000;
+constexpr uint32_t CONFIRMATION_TIMEOUT_MS = 10000;
 
-constexpr float POSSIBLE_IMPACT_LINEAR_G = 1.20f;
-constexpr float POSSIBLE_IMPACT_GYRO_DPS = 280.0f;
-constexpr float IMPACT_THRESHOLD_G = 2.50f;
-constexpr float GYRO_THRESHOLD_DPS = 450.0f;
-constexpr float ORIENTATION_THRESHOLD_DEG = 45.0f;
-constexpr float INACTIVITY_LINEAR_G = 0.18f;
+// Ngưỡng trigger khởi động cửa sổ quan sát (loại bỏ rung lắc cổ tay nhẹ)
+constexpr float POSSIBLE_IMPACT_LINEAR_G = 1.85f;
+constexpr float POSSIBLE_IMPACT_GYRO_DPS = 350.0f;
+constexpr float IMPACT_THRESHOLD_G = 3.00f;
+constexpr float GYRO_THRESHOLD_DPS = 480.0f;
+constexpr float ORIENTATION_THRESHOLD_DEG = 38.0f;
+constexpr float INACTIVITY_LINEAR_G = 0.22f;
 constexpr float INACTIVITY_GYRO_DPS = 35.0f;
-constexpr float AI_SUSPECT_PROBABILITY = 0.55f;
-constexpr float AI_CRASH_PROBABILITY = 0.70f;
+constexpr float AI_SUSPECT_PROBABILITY = 0.65f;
+constexpr float AI_CRASH_PROBABILITY = 0.75f;
 
-constexpr uint8_t CRASH_SCORE_THRESHOLD = 70;
+constexpr uint8_t CRASH_SCORE_THRESHOLD = 74;
 
 constexpr uint8_t WEIGHT_AI = 40;
 constexpr uint8_t WEIGHT_IMPACT = 25;

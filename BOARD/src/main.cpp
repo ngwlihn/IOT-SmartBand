@@ -7,6 +7,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
+#include <esp_wifi.h>
 
 #include "ai_model.h"
 #include "button_manager.h"
@@ -17,6 +18,7 @@
 #include "gps_manager.h"
 #include "imu_manager.h"
 #include "weather_manager.h"
+#include "text_utils.h"
 
 enum class SystemState : uint8_t {
   Normal,
@@ -77,6 +79,28 @@ class WifiProvisionCallbacks : public NimBLECharacteristicCallbacks {
       preferences.putString("screen3", (const char*) (json["screen"]["line3"] | ""));
       preferences.end();
       wifiProvisioned = true;
+      return;
+    }
+    if (json["medical"].is<JsonObject>()) {
+      Preferences preferences;
+      if (!preferences.begin("smartband", false)) return;
+      if (json["medical"]["name"].is<const char*>()) {
+        preferences.putString("med_name", TextUtils::removeDiacritics((const char*)json["medical"]["name"]));
+      }
+      if (json["medical"]["blood"].is<const char*>()) {
+        preferences.putString("med_blood", TextUtils::removeDiacritics((const char*)json["medical"]["blood"]));
+      }
+      if (json["medical"]["condition"].is<const char*>()) {
+        preferences.putString("med_cond", TextUtils::removeDiacritics((const char*)json["medical"]["condition"]));
+      }
+      if (json["medical"]["phone"].is<const char*>()) {
+        preferences.putString("med_phone", TextUtils::removeDiacritics((const char*)json["medical"]["phone"]));
+      }
+      if (json["medical"]["url"].is<const char*>()) {
+        preferences.putString("med_url", TextUtils::removeDiacritics((const char*)json["medical"]["url"]));
+      }
+      preferences.end();
+      Serial.println("[BLE] Medical profile synced to NVS (ASCII sanitized)");
       return;
     }
     const char* ssid = json["ssid"] | "";
@@ -176,16 +200,18 @@ void enterState(SystemState next) {
   stateEnterMs = millis();
   lastPage = 255;
   lastDisplayMs = 0;
-  if (state == SystemState::Normal || state == SystemState::PossibleImpact || state == SystemState::Analyzing ||
-      state == SystemState::Recovery) {
+  if (state == SystemState::Normal || state == SystemState::Recovery) {
     buzzerManager.setMode(BuzzerMode::Off);
+    setCpuFrequencyMhz(80); // Tiết kiệm pin tối đa khi bình thường
+  } else {
+    setCpuFrequencyMhz(240); // Tăng tốc 240MHz khi chấn động hoặc khẩn cấp
   }
   if (state == SystemState::UserConfirmation) {
     confirmationStartMs = millis();
     lastCountdown = 255;
     buttonManager.wasPressed();
     buzzerManager.setMode(BuzzerMode::UserConfirmation);
-    displayManager.showCrashDetected(15);
+    displayManager.showCrashDetected(Config::CONFIRMATION_TIMEOUT_MS / 1000);
   }
   if (state == SystemState::Emergency || state == SystemState::Sos) {
     alertEventMs = millis();
@@ -223,7 +249,10 @@ void processCommand(String command) {
   if (command == "test sos") {
     enterState(SystemState::Sos);
   }
-  if (command == "test normal") enterState(SystemState::Normal);
+  if (command == "test normal" || command == "cancel" || command == "stop") {
+    crashDetector.reset();
+    enterState(SystemState::Recovery);
+  }
 }
 
 void readSerial() {
@@ -334,7 +363,24 @@ void postTelemetry(uint32_t now, const SharedData& data) {
   if (http.begin(client, backendUrl + "/api/v1/telemetry")) {
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(1500);
-    http.POST(body);
+    int httpCode = http.POST(body);
+    if (httpCode > 0) {
+      String payload = http.getString();
+      JsonDocument resp;
+      if (deserializeJson(resp, payload) == DeserializationError::Ok) {
+        if (resp["medical"].is<JsonObject>()) {
+          Preferences p;
+          if (p.begin("smartband", false)) {
+            if (resp["medical"]["name"].is<const char*>()) p.putString("med_name", TextUtils::removeDiacritics((const char*)resp["medical"]["name"]));
+            if (resp["medical"]["blood"].is<const char*>()) p.putString("med_blood", TextUtils::removeDiacritics((const char*)resp["medical"]["blood"]));
+            if (resp["medical"]["condition"].is<const char*>()) p.putString("med_cond", TextUtils::removeDiacritics((const char*)resp["medical"]["condition"]));
+            if (resp["medical"]["phone"].is<const char*>()) p.putString("med_phone", TextUtils::removeDiacritics((const char*)resp["medical"]["phone"]));
+            if (resp["medical"]["url"].is<const char*>()) p.putString("med_url", TextUtils::removeDiacritics((const char*)resp["medical"]["url"]));
+            p.end();
+          }
+        }
+      }
+    }
     http.end();
   }
 }
@@ -407,7 +453,7 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
       }
       break;
     case SystemState::UserConfirmation:
-      if (buttonManager.wasPressed()) {
+      if (buttonManager.wasPressed() || buttonManager.wasHeld()) {
         crashDetector.reset();
         enterState(SystemState::Recovery);
       } else if (now - confirmationStartMs >= Config::CONFIRMATION_TIMEOUT_MS) {
@@ -416,7 +462,7 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
       break;
     case SystemState::Emergency:
     case SystemState::Sos:
-      if (buttonManager.wasPressed()) {
+      if (buttonManager.wasPressed() || buttonManager.wasHeld()) {
         crashDetector.reset();
         enterState(SystemState::Recovery);
       }
@@ -427,14 +473,29 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
   }
 }
 
+uint32_t manualQrUntilMs = 0;
+
 void showNormalPages(uint32_t now, const SharedData& data) {
-  Preferences preferences;
-  preferences.begin("smartband", true);
-  const String custom1 = preferences.getString("screen1", "");
-  const String custom2 = preferences.getString("screen2", "");
-  const String custom3 = preferences.getString("screen3", "");
-  preferences.end();
-  const uint8_t page = (now / Config::OLED_PAGE_MS) % (custom1.length() ? 4 : 3);
+  // Chu kỳ xoay trang:
+  // 0 -> 6s: Trang 0 (Giờ & Thời tiết)
+  // 6 -> 12s: Trang 1 (AI & GPS Tọa độ)
+  // 12 -> 18s: Trang 2 (GPS NMEA Status)
+  // 18 -> 32s (14 GIÂY): Trang 3 (MÃ QR CỨU HỘ & BỆNH ÁN - Giữ lâu cho camera quét)
+  const uint32_t cycleMs = 32000;
+  const uint32_t cyclePos = now % cycleMs;
+  uint8_t page = 0;
+  if (now < manualQrUntilMs) {
+    page = 3; // Bấm nút: Ưu tiên giữ trang QR cho quét
+  } else if (cyclePos < 6000) {
+    page = 0;
+  } else if (cyclePos < 12000) {
+    page = 1;
+  } else if (cyclePos < 18000) {
+    page = 2;
+  } else {
+    page = 3; // Giữ 14 giây
+  }
+
   if (page == lastPage && now - lastDisplayMs < Config::DISPLAY_REFRESH_MS) return;
   lastPage = page;
   lastDisplayMs = now;
@@ -446,8 +507,16 @@ void showNormalPages(uint32_t now, const SharedData& data) {
     displayManager.showAiLocation(data.prediction, data.gps);
   } else if (page == 2) {
     displayManager.showGpsStatus(data.gps);
-  } else {
-    displayManager.showCustom(custom1.c_str(), custom2.c_str(), custom3.c_str());
+  } else if (page == 3) {
+    Preferences preferences;
+    preferences.begin("smartband", true);
+    const String qrUrl = preferences.getString("med_url", "");
+    const String blood = preferences.getString("med_blood", "--");
+    const String cond = preferences.getString("med_cond", "CAP CUU");
+    const String phone = preferences.getString("med_phone", "115");
+    const String name = preferences.getString("med_name", "");
+    preferences.end();
+    displayManager.showEmergencyMedicalQr(qrUrl.c_str(), blood.c_str(), cond.c_str(), phone.c_str(), name.c_str());
   }
 }
 
@@ -464,12 +533,53 @@ void updateDisplay(uint32_t now, const SharedData& data) {
       lastCountdown = seconds;
       displayManager.showCrashDetected(seconds);
     }
+    return;
+  }
+  if (state == SystemState::Emergency || state == SystemState::Sos) {
+    if (now - lastDisplayMs < Config::DISPLAY_REFRESH_MS) return;
+    lastDisplayMs = now;
+
+    // Khi ngã thật / SOS: 3 giây đầu hiện thông báo to, sau đó GIỮ NGUYÊN MÃ QR CỐ ĐỊNH để người qua đường quét!
+    const uint32_t timeInEmergency = now - stateEnterMs;
+    if (timeInEmergency < 3000) {
+      if (state == SystemState::Sos) displayManager.showSos();
+      else displayManager.showEmergency();
+    } else {
+      Preferences preferences;
+      preferences.begin("smartband", true);
+      const String qrUrl = preferences.getString("med_url", "");
+      const String blood = preferences.getString("med_blood", "--");
+      const String cond = preferences.getString("med_cond", "CAP CUU");
+      const String phone = preferences.getString("med_phone", "115");
+      const String name = preferences.getString("med_name", "");
+      preferences.end();
+      displayManager.showEmergencyMedicalQr(qrUrl.c_str(), blood.c_str(), cond.c_str(), phone.c_str(), name.c_str());
+    }
   }
 }
 
 void setup() {
   Serial.begin(Config::SERIAL_BAUD);
   delay(500);
+
+  // Initialize Medical profile default keys in NVS if not present
+  Preferences medPrefs;
+  if (medPrefs.begin("smartband", false)) {
+    if (!medPrefs.isKey("med_name")) medPrefs.putString("med_name", "");
+    if (!medPrefs.isKey("med_blood")) medPrefs.putString("med_blood", "--");
+    if (!medPrefs.isKey("med_cond")) medPrefs.putString("med_cond", "CAP CUU");
+    if (!medPrefs.isKey("med_phone")) medPrefs.putString("med_phone", "115");
+    String curUrl = medPrefs.getString("med_url", "");
+    if (curUrl.isEmpty() || curUrl.indexOf("http") >= 0 || curUrl.indexOf("MECARD:") >= 0) {
+      // Chuyển hoàn toàn sang Plain Text Thông tin nạn nhân (quét ra text trực tiếp, không vào danh bạ)
+      medPrefs.putString("med_url", "THONG TIN NAN NHAN\nHo ten: Nguoi deo\nNhom mau: --\nBenh ly: Can cap cuu\nLH: 115");
+    }
+    medPrefs.end();
+  }
+
+  setCpuFrequencyMhz(80); // Bắt đầu ở chế độ tiết kiệm pin 80MHz
+  esp_wifi_set_ps(WIFI_PS_MIN_MODEM); // Bật chế độ tiết kiệm năng lượng Wi-Fi
+
   buzzerManager.begin();
   buttonManager.begin();
   Serial.println("[BOOT] OLED");
@@ -511,9 +621,19 @@ void loop() {
     ESP.restart();
   }
   buttonManager.update(now);
+  if (buttonManager.wasPressed() && state == SystemState::Normal) {
+    manualQrUntilMs = now + 25000; // Bấm nút nhẹ: Mở và GIỮ MÃ QR trong 25 giây cho quét thoải mái!
+    lastPage = 255;
+  }
   if (buttonManager.wasHeld()) {
-    enterState(SystemState::Sos);
-    Serial.println("[SOS] Long press emergency");
+    if (state == SystemState::Sos || state == SystemState::Emergency) {
+      crashDetector.reset();
+      enterState(SystemState::Recovery);
+      Serial.println("[SOS] Cancelled via button");
+    } else {
+      enterState(SystemState::Sos);
+      Serial.println("[SOS] Long press emergency");
+    }
   }
   buzzerManager.update(now);
   if (datasetMode && static_cast<int32_t>(now - datasetStopMs) >= 0) datasetMode = false;

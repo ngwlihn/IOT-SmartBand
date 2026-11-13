@@ -12,10 +12,13 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.view.KeyEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -35,9 +38,109 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var bluetoothGatt: BluetoothGatt? = null
     private var alertPlayer: MediaPlayer? = null
+    private var isEmergencyRinging = false
+    private var previousAlarmVolume = -1
+    private var previousMusicVolume = -1
+    private val volumeHandler = Handler(Looper.getMainLooper())
+    private val volumeEnforcer = object : Runnable {
+        override fun run() {
+            if (!isEmergencyRinging) return
+            enforceMaxVolumes()
+            volumeHandler.postDelayed(this, 300)
+        }
+    }
+
+    private fun enforceMaxVolumes() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            if (audioManager.getStreamVolume(AudioManager.STREAM_ALARM) < maxAlarm) {
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
+            }
+            if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < maxMusic) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun startEmergencyAlarmAudio() {
+        isEmergencyRinging = true
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (previousAlarmVolume == -1) {
+                previousAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            }
+            if (previousMusicVolume == -1) {
+                previousMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            }
+            enforceMaxVolumes()
+        } catch (_: Exception) {}
+
+        volumeHandler.removeCallbacks(volumeEnforcer)
+        volumeHandler.post(volumeEnforcer)
+
+        if (alertPlayer == null) {
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            if (uri != null) {
+                runCatching {
+                    alertPlayer = MediaPlayer().apply {
+                        setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                        setDataSource(this@MainActivity, uri)
+                        isLooping = true
+                        prepare()
+                        start()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopEmergencyAlarmAudio() {
+        isEmergencyRinging = false
+        volumeHandler.removeCallbacks(volumeEnforcer)
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (previousAlarmVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousAlarmVolume, 0)
+                previousAlarmVolume = -1
+            }
+            if (previousMusicVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, previousMusicVolume, 0)
+                previousMusicVolume = -1
+            }
+        } catch (_: Exception) {}
+
+        alertPlayer?.run {
+            stop()
+            release()
+        }
+        alertPlayer = null
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isEmergencyRinging && (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE)) {
+            enforceMaxVolumes()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
     private val settings by lazy { getSharedPreferences("smartband_state", MODE_PRIVATE) }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         androidx.core.content.ContextCompat.startForegroundService(this, Intent(this, EmergencyAlertService::class.java))
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)
@@ -82,16 +185,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun playEmergencyAlarm() {
             runOnUiThread {
-                if (alertPlayer != null) return@runOnUiThread
-                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM) ?: return@runOnUiThread
-                alertPlayer = MediaPlayer().apply {
-                    setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                    setDataSource(this@MainActivity, uri)
-                    isLooping = true
-                    prepare()
-                    start()
-                }
+                startEmergencyAlarmAudio()
             }
         }
 
@@ -99,9 +193,7 @@ class MainActivity : ComponentActivity() {
         fun stopEmergencyAlarm() {
             startService(Intent(this@MainActivity, EmergencyAlertService::class.java).setAction(EmergencyAlertService.ACTION_STOP_ALARM))
             runOnUiThread {
-                alertPlayer?.stop()
-                alertPlayer?.release()
-                alertPlayer = null
+                stopEmergencyAlarmAudio()
             }
         }
 
@@ -135,6 +227,30 @@ class MainActivity : ComponentActivity() {
                 }
                 val screen = org.json.JSONObject().put("line1", line1).put("line2", line2).put("line3", line3)
                 startBleScan(org.json.JSONObject().put("screen", screen).toString())
+            }
+        }
+
+        @JavascriptInterface
+        fun provisionMedical(blood: String, condition: String, phone: String, qrUrl: String) {
+            provisionMedicalProfile(blood, condition, phone, qrUrl, "")
+        }
+
+        @JavascriptInterface
+        fun provisionMedicalProfile(blood: String, condition: String, phone: String, qrUrl: String, name: String) {
+            runOnUiThread {
+                if (!hasBlePermission()) {
+                    ActivityCompat.requestPermissions(this@MainActivity, blePermissions(), 700)
+                    return@runOnUiThread
+                }
+                val medical = org.json.JSONObject()
+                    .put("blood", blood)
+                    .put("condition", condition)
+                    .put("phone", phone)
+                    .put("url", qrUrl)
+                if (name.isNotEmpty()) {
+                    medical.put("name", name)
+                }
+                startBleScan(org.json.JSONObject().put("medical", medical).toString())
             }
         }
     }
@@ -212,6 +328,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("is_emergency", false)) {
+            val kind = intent.getStringExtra("alert_type") ?: "FALL"
+            webView?.evaluateJavascript("window.onNativeEmergencyAlert && window.onNativeEmergencyAlert('$kind')", null)
+        }
     }
 
     override fun onDestroy() {

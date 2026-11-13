@@ -5,8 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
@@ -36,6 +38,27 @@ class EmergencyAlertService : Service() {
     private val worker = Executors.newSingleThreadExecutor()
     private val preferences by lazy { getSharedPreferences("smartband_alerts", MODE_PRIVATE) }
     private var alarmPlayer: MediaPlayer? = null
+    private var isEmergencyRinging = false
+    private var previousAlarmVolume = -1
+    private var previousMusicVolume = -1
+
+    private val volumeEnforcer = object : Runnable {
+        override fun run() {
+            if (!isEmergencyRinging) return
+            try {
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                if (audioManager.getStreamVolume(AudioManager.STREAM_ALARM) < maxAlarm) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
+                }
+                if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < maxMusic) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                }
+            } catch (_: Exception) {}
+            handler.postDelayed(this, 300)
+        }
+    }
     private var polling = false
     private val poll = object : Runnable {
         override fun run() {
@@ -75,7 +98,7 @@ class EmergencyAlertService : Service() {
     }
 
     private fun checkAlerts() {
-        val backend = preferences.getString("backend_url", "http://192.168.100.247:8787") ?: return
+        val backend = preferences.getString("backend_url", "http://172.11.103.28:8787") ?: return
         if (!backend.startsWith("http://") && !backend.startsWith("https://")) return
         val connection = try { URL("$backend/api/v1/alerts").openConnection() as HttpURLConnection } catch (_: Exception) { return }
         try {
@@ -102,18 +125,53 @@ class EmergencyAlertService : Service() {
     }
 
     private fun showEmergency(kind: String) {
-        val title = if (kind == "SOS") "SOS từ Smartband" else "Phát hiện ngã từ Smartband"
+        val title = if (kind == "SOS") "🚨 SOS KHẨN CẤP TỪ SMARTBAND" else "⚠️ PHÁT HIỆN TÉ NGÃ TỪ SMARTBAND"
         val stopIntent = Intent(this, EmergencyAlertService::class.java).setAction(ACTION_STOP_ALARM)
         val stopAction = PendingIntent.getService(this, 2, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
+            action = "com.smartband.iotcare.EMERGENCY_FULLSCREEN"
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("is_emergency", true)
+            putExtra("alert_type", kind)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            10,
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         getSystemService(NotificationManager::class.java).notify(2, NotificationCompat.Builder(this, ALERT_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(title)
-            .setContentText("Mở ứng dụng để xem và xác nhận an toàn")
+            .setContentText("Người thân gặp sự cố! Chạm để mở bản đồ & xử lý tức thì")
             .setContentIntent(openAppIntent())
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setAutoCancel(false)
+            .setOngoing(true)
             .addAction(android.R.drawable.ic_lock_silent_mode_off, "Tắt chuông", stopAction)
             .build())
+        isEmergencyRinging = true
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (previousAlarmVolume == -1) {
+                previousAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            }
+            if (previousMusicVolume == -1) {
+                previousMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            }
+            val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+        } catch (_: Exception) {}
+        handler.removeCallbacks(volumeEnforcer)
+        handler.post(volumeEnforcer)
+
         if (alarmPlayer == null) {
             runCatching {
                 val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -133,6 +191,19 @@ class EmergencyAlertService : Service() {
     }
 
     private fun stopAlarm() {
+        isEmergencyRinging = false
+        handler.removeCallbacks(volumeEnforcer)
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (previousAlarmVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousAlarmVolume, 0)
+                previousAlarmVolume = -1
+            }
+            if (previousMusicVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, previousMusicVolume, 0)
+                previousMusicVolume = -1
+            }
+        } catch (_: Exception) {}
         alarmPlayer?.run { stop(); release() }
         alarmPlayer = null
         val vibrator = if (Build.VERSION.SDK_INT >= 31) getSystemService(VibratorManager::class.java).defaultVibrator

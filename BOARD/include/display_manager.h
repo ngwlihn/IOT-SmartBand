@@ -18,6 +18,7 @@ class DisplayManager {
   void showCrashDetected(uint8_t secondsRemaining);
   void showRecovery();
   void showEmergency();
+  void showEmergencyMedicalQr(const char* qrText, const char* bloodGroup = nullptr, const char* condition = nullptr, const char* phone = nullptr, const char* name = nullptr);
   void showSos();
   void showCalibration();
   void showCalibrationOk();

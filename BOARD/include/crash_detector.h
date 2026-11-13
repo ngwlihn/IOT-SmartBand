@@ -33,6 +33,7 @@ class CrashDetector {
   float startPitchDeg_ = 0.0f;
   float startRollDeg_ = 0.0f;
   float peakAccelerationG_ = 0.0f;
+  float minAccelerationG_ = 1.0f;
   float peakGyroDps_ = 0.0f;
   float orientationDeltaDeg_ = 0.0f;
   uint32_t sampleCount_ = 0;

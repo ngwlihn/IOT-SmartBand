@@ -11,6 +11,7 @@ void CrashDetector::reset() {
   startPitchDeg_ = 0.0f;
   startRollDeg_ = 0.0f;
   peakAccelerationG_ = 0.0f;
+  minAccelerationG_ = 1.0f;
   peakGyroDps_ = 0.0f;
   orientationDeltaDeg_ = 0.0f;
   sampleCount_ = 0;
@@ -26,7 +27,7 @@ bool CrashDetector::shouldStartAnalysis(const MotionSample& sample, const AiPred
   if (sample.gyroMagnitudeDps >= Config::POSSIBLE_IMPACT_GYRO_DPS) {
     return true;
   }
-  return prediction.impact >= Config::AI_SUSPECT_PROBABILITY || prediction.crash >= Config::AI_SUSPECT_PROBABILITY;
+  return prediction.crash >= Config::AI_SUSPECT_PROBABILITY && sample.linearAccelerationG >= 1.20f;
 }
 
 void CrashDetector::beginAnalysis(const MotionSample& sample, const AiPrediction& prediction) {
@@ -45,13 +46,14 @@ void CrashDetector::updateAnalysis(const MotionSample& sample, const AiPredictio
 
   ++sampleCount_;
   peakAccelerationG_ = max(peakAccelerationG_, sample.linearAccelerationG);
+  minAccelerationG_ = min(minAccelerationG_, sample.linearAccelerationG);
   peakGyroDps_ = max(peakGyroDps_, sample.gyroMagnitudeDps);
   orientationDeltaDeg_ = max(orientationDeltaDeg_, SignalProcessing::orientationDeltaDeg(
                                                     startPitchDeg_, startRollDeg_, sample.pitchDeg, sample.rollDeg));
   bestAiCrashProbability_ = max(bestAiCrashProbability_, prediction.crash);
   bestAiImpactProbability_ = max(bestAiImpactProbability_, prediction.impact);
 
-  const bool postImpactStable = sample.timestampMs > eventStartMs_ + 700 &&
+  const bool postImpactStable = sample.timestampMs > eventStartMs_ + 500 &&
                                 sample.linearAccelerationG <= Config::INACTIVITY_LINEAR_G &&
                                 sample.gyroMagnitudeDps <= Config::INACTIVITY_GYRO_DPS;
   if (postImpactStable) {
@@ -87,11 +89,53 @@ CrashEvidence CrashDetector::evidence() const {
 
 bool CrashDetector::crashConfirmed() const {
   const CrashEvidence currentEvidence = evidence();
-  return currentEvidence.totalScore >= Config::CRASH_SCORE_THRESHOLD &&
-         peakAccelerationG_ >= Config::POSSIBLE_IMPACT_LINEAR_G &&
-         (bestAiCrashProbability_ >= Config::AI_CRASH_PROBABILITY ||
-          peakGyroDps_ >= Config::GYRO_THRESHOLD_DPS ||
-          orientationDeltaDeg_ >= Config::ORIENTATION_THRESHOLD_DEG);
+
+  // GUARD 1: Bắt buộc phải có va đập tối thiểu 1.95g!
+  // Xoay cổ tay thuần túy hoặc cử động tay thông thường có peakAcceleration < 1.2g.
+  // Không một cú ngã nào xuống sàn mà không có va đập ít nhất 1.95g.
+  if (peakAccelerationG_ < 1.95f) {
+    return false;
+  }
+
+  // GUARD 2 (Triệt tiêu vận động thường ngày & Đi bộ / Vung tay liên tục):
+  if (currentEvidence.inactivityRatio < 0.20f) {
+    return false;
+  }
+
+  // GUARD 3 (Kiểm tra lật đổi tư thế cơ thể bắt buộc):
+  // Vỗ tay hoặc cử động tại chỗ: góc thân người không đổi (orientationDelta < 35 độ).
+  // Khi ngã thật, người đổ xuống sàn thì góc nghiêng luôn thay đổi rõ rệt (>= 35 độ).
+  // (Ngoại trừ trường hợp va đập cực mạnh > 4.0g như bị tông xe).
+  if (orientationDeltaDeg_ < 35.0f && peakAccelerationG_ < 4.0f) {
+    return false;
+  }
+
+  // GUARD 4 (Chống báo động giả khi tháo vòng tay để lên bàn - Inanimate Table-Drop Guard):
+  // Khi tháo vòng tay đặt hoặc thả nhẹ lên bàn ở cự ly gần:
+  // - Không có pha rơi tự do từ độ cao (minAccelerationG > 0.55g)
+  // - Vận tốc góc xoay của cơ thể ngã rất thấp (peakGyroDps < 320 dps)
+  // - Va chạm vừa phải (peakAcceleration < 3.5g)
+  // - Sau đó nằm yên bất động 100% trên mặt bàn (inactivityRatio >= 0.85)
+  // -> Đây là thao tác tháo đồng hồ để lên bàn, KHÔNG PHẢI người thật ngã!
+  if (minAccelerationG_ > 0.55f && peakGyroDps_ < 320.0f && peakAccelerationG_ < 3.50f && currentEvidence.inactivityRatio >= 0.85f) {
+    return false;
+  }
+
+  // 2 NHÁNH XÁC NHẬN TAI NẠN:
+  // Nhánh 1: Vấp ngã va đập thông thường (Dynamic Fall with Impact)
+  // Bắt buộc: Va chạm mạnh (>= 2.20g) VÀ Góc nghiêng lật đổi (>= 38 độ) VÀ Điểm tổng hợp >= 74
+  const bool dynamicFall = (peakAccelerationG_ >= 2.20f) &&
+                           (orientationDeltaDeg_ >= Config::ORIENTATION_THRESHOLD_DEG) &&
+                           (currentEvidence.totalScore >= Config::CRASH_SCORE_THRESHOLD);
+
+  // Nhánh 2: Đột quỵ / Tụt huyết áp / Ngất sụp xuống (Syncope Collapse)
+  // Có va chạm tiếp đất (>= 1.95g), góc nghiêng lật đổ (>= 35 độ), nằm bất động kéo dài (>= 50%) và điểm cao
+  const bool syncopeFall = (peakAccelerationG_ >= 1.95f) &&
+                           (orientationDeltaDeg_ >= 35.0f) &&
+                           (currentEvidence.inactivityRatio >= 0.50f) &&
+                           (bestAiCrashProbability_ >= Config::AI_CRASH_PROBABILITY && currentEvidence.totalScore >= 70);
+
+  return dynamicFall || syncopeFall;
 }
 
 uint8_t CrashDetector::weightedScore(float value01, uint8_t weight) const {
