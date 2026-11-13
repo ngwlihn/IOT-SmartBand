@@ -102,6 +102,26 @@ void DisplayManager::showGpsStatus(const GpsData& gps) {
   if (available_) display.display();
 }
 
+void DisplayManager::showHeartHealth(const HeartData& heart) {
+  reset();
+  center("SUC KHOE", 0, 1);
+  char line[24];
+  if (!heart.sensorAvailable) {
+    center("MAX30100 ERROR", 22, 1);
+    center("SDA12 SCL10", 42, 1);
+  } else if (heart.valid) {
+    snprintf(line, sizeof(line), "NHIP TIM: %.0f", heart.heartRateBpm);
+    center(line, 18, 1);
+    snprintf(line, sizeof(line), "SpO2: %.0f%%", heart.spo2Percent);
+    center(line, 38, 2);
+    if (heart.retainingLastResult) center("KQ CU - CON 30 GIAY", 55, 1);
+  } else {
+    center("DAT NGON TAY", 20, 1);
+    center("LEN CAM BIEN", 40, 1);
+  }
+  if (available_) display.display();
+}
+
 void DisplayManager::showCustom(const char* line1, const char* line2, const char* line3) {
   reset();
   center(line1, 2, 1);
@@ -134,46 +154,21 @@ void DisplayManager::showEmergency() {
   if (available_) display.display();
 }
 
-void DisplayManager::showEmergencyMedicalQr(const char* qrText, const char* bloodGroup, const char* condition, const char* phone, const char* name) {
+void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData& heart, const char* phone) {
   reset();
   if (!available_) return;
 
   // Lọc sạch dấu tiếng Việt và ký tự đặc biệt sang chuẩn ASCII an toàn cho màn hình OLED SSD1306
-  String cleanBlood = TextUtils::removeDiacritics(bloodGroup ? bloodGroup : "");
-  cleanBlood.trim();
-  cleanBlood.toUpperCase();
-  if (cleanBlood.isEmpty() || cleanBlood.indexOf("CHUA") >= 0 || cleanBlood == "--") {
-    cleanBlood = "--";
-  }
-
-  String cleanCond = TextUtils::removeDiacritics(condition ? condition : "");
-  cleanCond.trim();
-  cleanCond.toUpperCase();
-  if (cleanCond.isEmpty()) cleanCond = "CAP CUU";
-
   String cleanPhone = TextUtils::removeDiacritics(phone ? phone : "");
   cleanPhone.trim();
   if (cleanPhone.isEmpty()) cleanPhone = "115";
 
-  String cleanName = TextUtils::removeDiacritics(name ? name : "");
-  cleanName.trim();
-  cleanName.toUpperCase();
-
-  // Chuẩn bị nội dung QR Code:
-  // QUY TẮC: Văn bản thuần túy (Plain Text) chứa thông tin nạn nhân để cấp cứu.
-  // Tuyệt đối KHÔNG dùng MECARD: (để không bị điện thoại hiểu nhầm là danh bạ / thêm vào danh bạ).
+  // QR points to the medical history supplied by the app/backend.
   String payload;
-  if (qrText && qrText[0] && strncmp(qrText, "MECARD:", 7) != 0 && strncmp(qrText, "http", 4) != 0) {
+  if (qrText && qrText[0]) {
     payload = TextUtils::removeDiacritics(qrText);
   } else {
-    // Tự sinh nội dung thông tin nạn nhân dạng Plain Text dễ đọc cho mọi app camera/Zalo
-    payload = "THONG TIN NAN NHAN\n";
-    if (cleanName.length() > 0) {
-      payload += "Ho ten: " + cleanName + "\n";
-    }
-    payload += "Nhom mau: " + cleanBlood + "\n";
-    payload += "Benh ly: " + cleanCond + "\n";
-    payload += "LH: " + cleanPhone;
+    payload = "LICH SU BENH: CHUA DONG BO\nLH CON CAI: " + cleanPhone;
   }
 
   // Tự động chọn phiên bản QR Code phù hợp với độ dài văn bản
@@ -197,8 +192,7 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const char* bloo
   if (initRes != 0) {
     // Dự phòng an toàn nếu chuỗi quá dài: rút gọn để vừa Version 3
     char fallbackText[64];
-    snprintf(fallbackText, sizeof(fallbackText), "NAN NHAN: %.10s\nMAU: %s\nBENH: %.10s\nLH: %s",
-             cleanName.c_str(), cleanBlood.c_str(), cleanCond.c_str(), cleanPhone.c_str());
+    snprintf(fallbackText, sizeof(fallbackText), "LICH SU BENH\nLH CON CAI: %s", cleanPhone.c_str());
     qrcode_initText(&qrcode, qrcodeData, 3, ECC_LOW, fallbackText);
   }
 
@@ -231,26 +225,18 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const char* bloo
   display.print("SOS Y TE");
   display.drawLine(textX, 11, 127, 11, SSD1306_WHITE);
 
-  // Dòng 1: Tên nạn nhân (hoặc NAN NHAN)
   display.setCursor(textX, 15);
-  if (cleanName.length() > 0) {
-    display.printf("%.11s", cleanName.c_str());
-  } else {
-    display.print("NAN NHAN");
-  }
+  if (heart.valid) display.printf("NHIP TIM:%.0f", heart.heartRateBpm);
+  else display.print("NHIP TIM:--");
 
-  // Dòng 2: Nhóm máu
   display.setCursor(textX, 26);
-  display.printf("MAU: %s", cleanBlood.c_str());
+  if (heart.valid) display.printf("SpO2:%.0f%%", heart.spo2Percent);
+  else display.print("SpO2:--");
 
-  // Dòng 3: Bệnh nền
   display.setCursor(textX, 37);
-  display.printf("%.11s", cleanCond.c_str());
+  display.print("LH CON CAI:");
 
-  // Dòng 4: SĐT người thân
-  display.setCursor(textX, 48);
-  display.print("LH:");
-  display.setCursor(textX, 56);
+  display.setCursor(textX, 49);
   display.printf("%.11s", cleanPhone.c_str());
 
   display.display();

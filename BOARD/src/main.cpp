@@ -16,6 +16,7 @@
 #include "crash_detector.h"
 #include "display_manager.h"
 #include "gps_manager.h"
+#include "heart_sensor.h"
 #include "imu_manager.h"
 #include "weather_manager.h"
 #include "text_utils.h"
@@ -35,6 +36,7 @@ struct SharedData {
   AiPrediction prediction;
   GpsData gps;
   WeatherData weather;
+  HeartData heart;
   uint32_t sampleSequence = 0;
 };
 
@@ -42,6 +44,7 @@ ImuManager imu;
 AiModel aiModel;
 GpsManager gpsManager;
 WeatherManager weatherManager;
+HeartSensor heartSensor;
 CrashDetector crashDetector;
 DisplayManager displayManager;
 BuzzerManager buzzerManager;
@@ -195,6 +198,16 @@ void weatherTask(void*) {
   }
 }
 
+void heartTask(void*) {
+  for (;;) {
+    heartSensor.update(millis());
+    xSemaphoreTake(dataMutex, portMAX_DELAY);
+    sharedData.heart = heartSensor.data();
+    xSemaphoreGive(dataMutex);
+    vTaskDelay(pdMS_TO_TICKS(Config::HEART_SENSOR_INTERVAL_MS));
+  }
+}
+
 void enterState(SystemState next) {
   state = next;
   stateEnterMs = millis();
@@ -310,10 +323,17 @@ void postTelemetry(uint32_t now, const SharedData& data) {
   json["state"] = stateName();
   json["alert_type"] = state == SystemState::Sos ? "SOS" : state == SystemState::Emergency ? "FALL" : "";
   json["alert_event_ms"] = alertEventMs;
+  json["alert_active"] = state == SystemState::Emergency || state == SystemState::Sos;
   json["ai"] = motionClassName(data.prediction.predictedClass);
   json["ai_normal"] = data.prediction.normal;
   json["ai_impact"] = data.prediction.impact;
   json["ai_crash"] = data.prediction.crash;
+  json["health"]["sensor_available"] = data.heart.sensorAvailable;
+  json["health"]["finger_detected"] = data.heart.fingerDetected;
+  json["health"]["valid"] = data.heart.valid;
+  json["health"]["retaining_last_result"] = data.heart.retainingLastResult;
+  json["health"]["heart_rate_bpm"] = data.heart.valid ? data.heart.heartRateBpm : 0;
+  json["health"]["spo2_percent"] = data.heart.valid ? data.heart.spo2Percent : 0;
   json["gps"]["valid"] = data.gps.locationValid;
   json["gps"]["lat"] = data.gps.latitude;
   json["gps"]["lon"] = data.gps.longitude;
@@ -321,6 +341,7 @@ void postTelemetry(uint32_t now, const SharedData& data) {
   json["gps"]["satellites"] = data.gps.satellites;
   json["gps"]["nmea"] = data.gps.charsProcessed;
   json["gps"]["hdop"] = data.gps.hdop;
+  json["gps"]["accuracy_m"] = data.gps.hdop > 0 ? data.gps.hdop * 5.0f : 0;
   json["gps"]["altitude_m"] = data.gps.altitudeM;
   json["wifi_rssi"] = WiFi.RSSI();
   json["wifi_ssid"] = WiFi.SSID();
@@ -405,6 +426,12 @@ void printFullStatus(uint32_t now, const SharedData& data) {
   Serial.printf("NORMAL   : %.3f\n", data.prediction.normal);
   Serial.printf("IMPACT   : %.3f\n", data.prediction.impact);
   Serial.printf("CRASH    : %.3f\n", data.prediction.crash);
+  Serial.printf("HEART    : %s", data.heart.sensorAvailable ? (data.heart.fingerDetected ? "FINGER" : "WAIT FINGER") : "MAX30100 ERROR");
+  if (data.heart.valid) Serial.printf(" %.0f bpm", data.heart.heartRateBpm);
+  Serial.println();
+  Serial.printf("SpO2     : %s", data.heart.valid ? "VALID" : "--");
+  if (data.heart.valid) Serial.printf(" %.0f%%", data.heart.spo2Percent);
+  Serial.println();
   Serial.printf("WIFI     : %s\n", wifiConnected ? "CONNECTED" : "DISCONNECTED");
   Serial.printf("SSID     : %s\n", WiFi.SSID().c_str());
   Serial.printf("RSSI     : %d dBm\n", wifiConnected ? WiFi.RSSI() : 0);
@@ -453,19 +480,12 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
       }
       break;
     case SystemState::UserConfirmation:
-      if (buttonManager.wasPressed() || buttonManager.wasHeld()) {
-        crashDetector.reset();
-        enterState(SystemState::Recovery);
-      } else if (now - confirmationStartMs >= Config::CONFIRMATION_TIMEOUT_MS) {
+      if (now - confirmationStartMs >= Config::CONFIRMATION_TIMEOUT_MS) {
         enterState(SystemState::Emergency);
       }
       break;
     case SystemState::Emergency:
     case SystemState::Sos:
-      if (buttonManager.wasPressed() || buttonManager.wasHeld()) {
-        crashDetector.reset();
-        enterState(SystemState::Recovery);
-      }
       break;
     case SystemState::Recovery:
       if (now - stateEnterMs >= Config::RECOVERY_SCREEN_MS) enterState(SystemState::Normal);
@@ -506,17 +526,14 @@ void showNormalPages(uint32_t now, const SharedData& data) {
   } else if (page == 1) {
     displayManager.showAiLocation(data.prediction, data.gps);
   } else if (page == 2) {
-    displayManager.showGpsStatus(data.gps);
+    displayManager.showHeartHealth(data.heart);
   } else if (page == 3) {
     Preferences preferences;
     preferences.begin("smartband", true);
     const String qrUrl = preferences.getString("med_url", "");
-    const String blood = preferences.getString("med_blood", "--");
-    const String cond = preferences.getString("med_cond", "CAP CUU");
     const String phone = preferences.getString("med_phone", "115");
-    const String name = preferences.getString("med_name", "");
     preferences.end();
-    displayManager.showEmergencyMedicalQr(qrUrl.c_str(), blood.c_str(), cond.c_str(), phone.c_str(), name.c_str());
+    displayManager.showEmergencyMedicalQr(qrUrl.c_str(), data.heart, phone.c_str());
   }
 }
 
@@ -548,12 +565,9 @@ void updateDisplay(uint32_t now, const SharedData& data) {
       Preferences preferences;
       preferences.begin("smartband", true);
       const String qrUrl = preferences.getString("med_url", "");
-      const String blood = preferences.getString("med_blood", "--");
-      const String cond = preferences.getString("med_cond", "CAP CUU");
       const String phone = preferences.getString("med_phone", "115");
-      const String name = preferences.getString("med_name", "");
       preferences.end();
-      displayManager.showEmergencyMedicalQr(qrUrl.c_str(), blood.c_str(), cond.c_str(), phone.c_str(), name.c_str());
+      displayManager.showEmergencyMedicalQr(qrUrl.c_str(), data.heart, phone.c_str());
     }
   }
 }
@@ -601,6 +615,8 @@ void setup() {
   aiModel.begin();
   Serial.println("[BOOT] GPS");
   gpsManager.begin();
+  Serial.println("[BOOT] MAX30100 SDA=12 SCL=10");
+  if (!heartSensor.begin()) Serial.println("[WARN] MAX30100 not found; health values unavailable");
   Serial.println("[BOOT] WIFI");
   beginBleProvisioning();
   weatherManager.begin();
@@ -609,6 +625,7 @@ void setup() {
   xTaskCreatePinnedToCore(imuAiTask, "IMU_AI", 6144, nullptr, 2, nullptr, 1);
   xTaskCreatePinnedToCore(gpsTask, "GPS", 4096, nullptr, 2, nullptr, 0);
   xTaskCreatePinnedToCore(weatherTask, "WEATHER", 8192, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(heartTask, "MAX30100", 4096, nullptr, 1, nullptr, 0);
   Serial.println("[BOOT] TASKS READY");
 }
 
@@ -621,9 +638,15 @@ void loop() {
     ESP.restart();
   }
   buttonManager.update(now);
-  if (buttonManager.wasPressed() && state == SystemState::Normal) {
-    manualQrUntilMs = now + 25000; // Bấm nút nhẹ: Mở và GIỮ MÃ QR trong 25 giây cho quét thoải mái!
-    lastPage = 255;
+  if (buttonManager.wasPressed()) {
+    if (state == SystemState::Emergency || state == SystemState::Sos || state == SystemState::UserConfirmation) {
+      crashDetector.reset();
+      enterState(SystemState::Recovery);
+      Serial.println("[SOS] Alarm stopped by short press; AI status continues in telemetry");
+    } else if (state == SystemState::Normal) {
+      manualQrUntilMs = now + 25000;
+      lastPage = 255;
+    }
   }
   if (buttonManager.wasHeld()) {
     if (state == SystemState::Sos || state == SystemState::Emergency) {

@@ -31,3 +31,13 @@ struct WeatherData {
   uint8_t rainProbability = 0;
   int weatherCode = 0;
 };
+
+struct HeartData {
+  bool sensorAvailable = false;
+  bool fingerDetected = false;
+  bool valid = false;
+  bool retainingLastResult = false;
+  float heartRateBpm = 0.0f;
+  float spo2Percent = 0.0f;
+  uint32_t updatedAtMs = 0;
+};

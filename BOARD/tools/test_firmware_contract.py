@@ -11,8 +11,8 @@ class FirmwareContractTest(unittest.TestCase):
 
     def test_fixed_pins_and_wifi_power(self):
         config = self.source("include/config.h")
-        self.assertIn("GPS_TX = 1", config)
-        self.assertIn("GPS_RX = 2", config)
+        self.assertIn("GPS_TX = 7", config)
+        self.assertIn("GPS_RX = 6", config)
         self.assertNotIn('WIFI_PASSWORD =', config)
         self.assertIn('BLE_WIFI_CHAR_UUID', config)
         self.assertIn("WIFI_POWER_8_5dBm", self.source("src/weather_manager.cpp"))
@@ -46,6 +46,9 @@ class FirmwareContractTest(unittest.TestCase):
         self.assertIn("HardwareSerial GPS_Serial(1)", source)
         self.assertIn("charsProcessed", data)
         self.assertIn("failedChecksum", data)
+        self.assertIn("GPS_JUMP_CONFIRM_M", self.source("include/config.h"))
+        self.assertIn("pendingJumpCount_", header)
+        self.assertIn("GPS_JITTER_DEADBAND_M", source)
 
     def test_weather_reports_pipeline_state_and_uses_https_client(self):
         data = self.source("include/system_data.h")
@@ -66,6 +69,21 @@ class FirmwareContractTest(unittest.TestCase):
         main = self.source("src/main.cpp")
         for stage in ("OLED", "BMI160", "CALIBRATION", "AI", "GPS", "WIFI", "TASKS READY"):
             self.assertIn(stage, main)
+
+    def test_max30100_health_pipeline_and_sos_button(self):
+        config = self.source("include/config.h")
+        main = self.source("src/main.cpp")
+        display = self.source("src/display_manager.cpp")
+        self.assertIn("MAX30100_SDA = 12", config)
+        self.assertIn("MAX30100_SCL = 10", config)
+        self.assertIn("HEART_RESULT_HOLD_MS = 30000", config)
+        self.assertIn('json["health"]["heart_rate_bpm"]', main)
+        self.assertIn('json["health"]["spo2_percent"]', main)
+        self.assertIn('json["health"]["retaining_last_result"]', main)
+        self.assertIn("showHeartHealth", display)
+        self.assertIn('display.print("LH CON CAI:")', display)
+        self.assertIn("state == SystemState::UserConfirmation", main)
+        self.assertIn("enterState(SystemState::Sos)", main)
 
 
 if __name__ == "__main__":

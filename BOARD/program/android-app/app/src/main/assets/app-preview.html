@@ -1356,7 +1356,7 @@
   <script>
     const persistKeys = ['smartband_backend_url', 'tantam_auth_token', 'tantam_session',
       'tantam_reg_email', 'tantam_reg_name', 'tantam_wearer_profile', 'tantam_home_address',
-      'tantam_home_lat', 'tantam_home_lng', 'tantam_home_verified', 'smartband_last_snapshot'];
+      'tantam_home_lat', 'tantam_home_lng', 'tantam_home_radius', 'tantam_home_verified', 'smartband_last_snapshot'];
     function persistAppState() {
       const state = {};
       for (const key of persistKeys) {
@@ -1476,8 +1476,8 @@
       wearerProfile.currentAddress = homeLocation.address;
     }
 
-    let personLat = homeLocation.lat + 0.00015;
-    let personLng = homeLocation.lng + 0.00010;
+    let personLat = homeLocation.lat;
+    let personLng = homeLocation.lng;
 
     function calculateGpsDistanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371e3;
@@ -3226,7 +3226,17 @@
         setText('kitGpsDetail', gps.valid ? location : 'Đang tìm GPS');
         setText('kitWifiState', fresh ? `${latest.wifi_rssi ?? 'N/A'} dBm` : 'Mất kết nối');
         setText('kitWifiDetail', fresh ? 'Smartband trực tuyến' : 'Kiểm tra Wi-Fi và backend');
+        const health = latest.health || {};
+        const healthReady = fresh && health.valid === true;
+        setText('kitHeartRate', healthReady ? `${Number(health.heart_rate_bpm).toFixed(0)} bpm` : (health.sensor_available === false ? 'Chưa kết nối' : '-- bpm'));
+        setText('kitHeartDetail', healthReady ? (health.retaining_last_result ? 'Kết quả cuối · giữ tối đa 30 giây' : 'Đo trực tiếp MAX30100') : (health.finger_detected ? 'Đang ổn định tín hiệu' : 'Đặt ngón tay lên cảm biến'));
+        setText('kitSpo2', healthReady ? `${Number(health.spo2_percent).toFixed(0)}%` : '--%');
+        setText('kitSpo2Detail', healthReady ? (health.retaining_last_result ? 'Đã bỏ ngón tay · kết quả tạm giữ' : 'Nồng độ oxy trong máu') : 'Chưa có kết quả hợp lệ');
         setText('kitUpdatedAt', time);
+        if (gps.valid && Number.isFinite(Number(gps.lat)) && Number.isFinite(Number(gps.lon))) {
+          personLat = Number(gps.lat);
+          personLng = Number(gps.lon);
+        }
         const map = document.getElementById('kitMap');
         if (map && gps.valid && Number.isFinite(Number(gps.lat)) && Number.isFinite(Number(gps.lon))) {
           const lat = Number(gps.lat).toFixed(6);
@@ -3259,6 +3269,7 @@
           setText('kitSafeDetail', `Cách nhà ${distance} m`);
           const zone = document.getElementById('kitSafeZone');
           if (zone) zone.className = !isOutside ? 'text-emerald-700 font-bold' : 'text-rose-600 font-black animate-pulse';
+          setText('trackingSafeZone', !isOutside ? `Trong vùng an toàn · cách tâm ${distance} m` : `Ngoài vùng an toàn · cách tâm ${distance} m`);
 
           const geoBanner = document.getElementById('geofenceWarningBanner');
           if (geoBanner) {
@@ -3276,6 +3287,7 @@
           setText('kitSafeDetail', fresh ? 'Cài tọa độ nhà trong Hồ sơ' : 'Kit đang offline');
           const geoBanner = document.getElementById('geofenceWarningBanner');
           if (geoBanner) geoBanner.classList.add('hidden');
+          setText('trackingSafeZone', localStorage.getItem('tantam_home_verified') === '1' ? 'Đang chờ GPS mới từ kit' : 'Chưa thiết lập vùng an toàn');
         }
         recordAiSample(latest, fresh);
         if (currentTab === 'dashboard' && Date.now() - lastStopLogRefresh >= 10000) {
@@ -3311,7 +3323,16 @@
     }
     function showLiveKitData(container) {
       clearInterval(snapshotRefreshTimer);
-      container.innerHTML = `<div id="realKitSnapshot" class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-slate-700">Đang tải dữ liệu từ kit...</div>${currentTab === 'tracking' ? '<div class="h-72 border border-slate-200 rounded-lg overflow-hidden"><iframe id="kitMap" title="Vị trí GPS của Smartband" class="w-full h-full border-0" loading="lazy"></iframe></div>' : ''}${currentTab === 'behavior' ? '<div class="p-3 bg-white border border-slate-200 rounded-lg"><div class="text-xs font-bold mb-2">AI mỗi 10 giây</div><div class="flex gap-3 text-[10px] mb-2"><span class="text-emerald-700">● Normal</span><span class="text-amber-700">● Impact</span><span class="text-rose-700">● Crash</span></div><div id="kitAiChart" class="space-y-1"></div></div>' : ''}`;
+      const trackingTools = currentTab === 'tracking' ? `<div class="space-y-2">
+        <div class="h-72 border border-slate-200 rounded-lg overflow-hidden"><iframe id="kitMap" title="Vị trí GPS của Smartband" class="w-full h-full border-0" loading="lazy"></iframe></div>
+        <div id="trackingSafeZone" class="p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700">Đang kiểm tra vùng an toàn...</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="openCurrentGpsInGoogleMaps()" class="py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black"><i class="fa-solid fa-map-location-dot mr-1"></i>Mở Google Maps</button>
+          <button onclick="setSafeZoneFromCurrentKit()" class="py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-black"><i class="fa-solid fa-shield-halved mr-1"></i>Đặt tâm vùng an toàn</button>
+        </div>
+        <div class="grid grid-cols-4 gap-1.5">${[100,250,500,1000].map(r => `<button onclick="selectGeofenceRadius(${r})" class="py-2 rounded-lg border text-[10px] font-bold ${homeLocation.radius === r ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'}">${r === 1000 ? '1 km' : r + ' m'}</button>`).join('')}</div>
+      </div>` : '';
+      container.innerHTML = `<div id="realKitSnapshot" class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-slate-700">Đang tải dữ liệu từ kit...</div>${trackingTools}${currentTab === 'behavior' ? '<div class="p-3 bg-white border border-slate-200 rounded-lg"><div class="text-xs font-bold mb-2">AI mỗi 10 giây</div><div class="flex gap-3 text-[10px] mb-2"><span class="text-emerald-700">● Normal</span><span class="text-amber-700">● Impact</span><span class="text-rose-700">● Crash</span></div><div id="kitAiChart" class="space-y-1"></div></div>' : ''}`;
       if (currentTab === 'behavior') lastAiSampleAt = 0;
       loadRealSnapshot();
       snapshotRefreshTimer = setInterval(loadRealSnapshot, 1000);
@@ -3414,6 +3435,22 @@
         container.innerHTML = `
           <!-- 1. Bốn Thẻ Chỉ Số Trạng Thái -->
           <div class="grid grid-cols-2 gap-2">
+            <div class="p-2.5 bg-white border border-rose-200 rounded-2xl shadow-2xs">
+              <div class="flex justify-between text-slate-500 text-[10px] font-bold">
+                <span>NHỊP TIM</span><i class="fa-solid fa-heart-pulse text-rose-600"></i>
+              </div>
+              <p id="kitHeartRate" class="text-sm font-black text-rose-700 mt-0.5">-- bpm</p>
+              <p id="kitHeartDetail" class="text-[9px] text-slate-500 truncate">Đang chờ MAX30100</p>
+            </div>
+
+            <div class="p-2.5 bg-white border border-cyan-200 rounded-2xl shadow-2xs">
+              <div class="flex justify-between text-slate-500 text-[10px] font-bold">
+                <span>SpO2</span><i class="fa-solid fa-droplet text-cyan-600"></i>
+              </div>
+              <p id="kitSpo2" class="text-sm font-black text-cyan-700 mt-0.5">--%</p>
+              <p id="kitSpo2Detail" class="text-[9px] text-slate-500 truncate">Đang chờ kết quả</p>
+            </div>
+
             <div class="p-2.5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs">
               <div class="flex justify-between text-slate-500 text-[10px] font-bold">
                 <span>AI / CẢM BIẾN</span>
@@ -3469,8 +3506,8 @@
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span class="text-[11px] font-black">VỊ TRÍ THIẾT BỊ</span>
               </span>
-              <button onclick="setMainTab('tracking')" class="text-blue-600 font-bold text-[10px] hover:underline flex items-center gap-1 cursor-pointer">
-                <span>Xem chi tiết</span>
+              <button onclick="openCurrentGpsInGoogleMaps()" class="text-blue-600 font-bold text-[10px] hover:underline flex items-center gap-1 cursor-pointer">
+                <span>Xem trên Google Maps</span>
                 <i class="fa-solid fa-arrow-right text-[9px]"></i>
               </button>
             </div>
@@ -4586,8 +4623,50 @@
     function openLocationOnMap(lat, lng, label) {
       personLat = lat;
       personLng = lng;
-      setMainTab('tracking');
-      showToast(`Đã xem vị trí: ${label || 'đã chọn'} trên bản đồ!`);
+      openGpsInGoogleMaps(lat, lng);
+      showToast(`Đang mở vị trí ${label || 'đã chọn'} trên Google Maps`);
+    }
+
+    function openGpsInGoogleMaps(lat, lng) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+        showToast('Chưa có tọa độ GPS hợp lệ từ kit.');
+        return;
+      }
+      if (window.NativeBridge?.openGoogleMaps) {
+        window.NativeBridge.openGoogleMaps(lat, lng);
+      } else {
+        window.location.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+      }
+    }
+
+    function openCurrentGpsInGoogleMaps() {
+      const gps = latestKitSnapshot?.gps;
+      if (!gps?.valid) {
+        showToast('Đang chờ GPS ổn định từ kit.');
+        return;
+      }
+      openGpsInGoogleMaps(Number(gps.lat), Number(gps.lon));
+    }
+
+    function setSafeZoneFromCurrentKit() {
+      const latest = latestKitSnapshot;
+      const gps = latest?.gps;
+      const received = Date.parse(latest?.received_at || '');
+      if (!gps?.valid || !Number.isFinite(received) || Date.now() - received > 30000) {
+        showToast('Cần GPS mới và ổn định từ kit để đặt vùng an toàn.');
+        return;
+      }
+      homeLocation.lat = Number(gps.lat);
+      homeLocation.lng = Number(gps.lon);
+      homeLocation.address = 'Tâm vùng an toàn từ GPS Smartband';
+      localStorage.setItem('tantam_home_address', homeLocation.address);
+      localStorage.setItem('tantam_home_lat', homeLocation.lat);
+      localStorage.setItem('tantam_home_lng', homeLocation.lng);
+      localStorage.setItem('tantam_home_radius', homeLocation.radius || 250);
+      localStorage.setItem('tantam_home_verified', '1');
+      persistAppState();
+      renderMainTabContent();
+      showToast(`Đã đặt tâm vùng an toàn tại ${homeLocation.lat.toFixed(6)}, ${homeLocation.lng.toFixed(6)}`);
     }
 
     function openMovementHistoryModal() {
@@ -4659,9 +4738,7 @@
       localStorage.setItem('tantam_home_lat', homeLocation.lat);
       localStorage.setItem('tantam_home_lng', homeLocation.lng);
 
-      // Định vị người đeo ban đầu ở ngay trong khuôn viên nhà
-      personLat = homeLocation.lat + 0.00015;
-      personLng = homeLocation.lng + 0.00010;
+      localStorage.setItem('tantam_home_verified', '1');
 
       renderMainTabContent();
       showToast(`✅ Đã lưu nơi ở & đồng bộ hồ sơ: ${addr}`);
@@ -4690,12 +4767,7 @@
         },
         (err) => {
           console.warn('GPS Geolocation error:', err);
-          // Giả lập di chuyển thực tế nhẹ nếu trình duyệt chặn cấp quyền GPS
-          personLat = homeLocation.lat + 0.00042;
-          personLng = homeLocation.lng + 0.00035;
-          const distFromHome = Math.round(calculateGpsDistanceMeters(homeLocation.lat, homeLocation.lng, personLat, personLng));
-          renderMainTabContent();
-          showToast(`📍 Đã xác định vị trí di chuyển thực tế: ${personLat.toFixed(5)}, ${personLng.toFixed(5)} (Cách nhà ${distFromHome}m)`);
+          showToast('Không lấy được GPS điện thoại. Hãy cấp quyền vị trí hoặc dùng GPS từ kit.');
         },
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );

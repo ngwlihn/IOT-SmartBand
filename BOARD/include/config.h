@@ -4,16 +4,19 @@
 
 namespace Config {
 
-constexpr uint8_t BMI160_SDA = 6;
-constexpr uint8_t BMI160_SCL = 7;
+constexpr uint8_t BMI160_SDA = 4;
+constexpr uint8_t BMI160_SCL = 5;
 
 constexpr uint8_t OLED_SDA = 9;
 constexpr uint8_t OLED_SCL = 8;
 
-constexpr uint8_t BUZZER_PIN = 5;
-constexpr uint8_t BUTTON_PIN = 4;
-constexpr uint8_t GPS_TX = 1;
-constexpr uint8_t GPS_RX = 2;
+constexpr uint8_t MAX30100_SDA = 12;
+constexpr uint8_t MAX30100_SCL = 10;
+
+constexpr uint8_t BUZZER_PIN = 1;
+constexpr uint8_t BUTTON_PIN = 11;
+constexpr uint8_t GPS_TX = 7;
+constexpr uint8_t GPS_RX = 6;
 constexpr uint32_t GPS_BAUD = 9600;
 
 // Wi-Fi credentials are provisioned over BLE and stored in ESP32 NVS.
@@ -44,6 +47,12 @@ constexpr uint32_t SERIAL_STATUS_MS = 3000;
 constexpr uint32_t WEATHER_REFRESH_MS = 900000;
 constexpr uint32_t WIFI_RETRY_MS = 30000;
 constexpr uint32_t TELEMETRY_INTERVAL_MS = 2000;
+constexpr uint32_t HEART_SENSOR_INTERVAL_MS = 10;
+constexpr uint32_t HEART_RESULT_HOLD_MS = 30000;
+constexpr uint32_t GPS_HOLD_VALID_MS = 15000;
+constexpr float GPS_MAX_HDOP = 5.0f;
+constexpr float GPS_JITTER_DEADBAND_M = 3.0f;
+constexpr float GPS_JUMP_CONFIRM_M = 80.0f;
 
 constexpr uint32_t CONFIRMATION_TIMEOUT_MS = 10000;
 

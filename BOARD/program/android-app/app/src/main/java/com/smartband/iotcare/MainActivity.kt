@@ -18,6 +18,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.view.KeyEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -202,6 +203,17 @@ class MainActivity : ComponentActivity() {
             startService(Intent(this@MainActivity, EmergencyAlertService::class.java)
                 .setAction(EmergencyAlertService.ACTION_UPDATE_BACKEND)
                 .putExtra(EmergencyAlertService.EXTRA_BACKEND_URL, url))
+        }
+
+        @JavascriptInterface
+        fun openGoogleMaps(latitude: Double, longitude: Double) {
+            val geoUri = Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude(Smartband)")
+            val googleMapsIntent = Intent(Intent.ACTION_VIEW, geoUri).setPackage("com.google.android.apps.maps")
+            val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$latitude,$longitude"))
+            runOnUiThread {
+                runCatching { startActivity(googleMapsIntent) }
+                    .onFailure { startActivity(fallbackIntent) }
+            }
         }
 
         @JavascriptInterface

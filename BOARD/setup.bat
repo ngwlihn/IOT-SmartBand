@@ -78,6 +78,13 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo Verifying MAX30100 health telemetry and SOS firmware contract...
+py -3.10 "%PROJECT_ROOT%\tools\test_firmware_contract.py"
+if errorlevel 1 (
+  echo Firmware contract check failed.
+  exit /b 1
+)
+
 set "ESP_PORT="
 set "ESP_PORT_COUNT=0"
 for /f "delims=" %%P in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_ROOT%\tools\find_esp_port.ps1"') do (
@@ -104,7 +111,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Building Android APK (EmailJS OTP)...
+echo Building Android APK with live heart rate and SpO2 display...
 pushd "%PROJECT_ROOT%\program\android-app"
 call gradlew.bat :app:assembleDebug
 if errorlevel 1 (
