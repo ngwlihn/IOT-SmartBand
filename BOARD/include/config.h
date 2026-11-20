@@ -69,11 +69,16 @@ constexpr float AI_CRASH_PROBABILITY = 0.75f;
 
 constexpr uint8_t CRASH_SCORE_THRESHOLD = 74;
 
-constexpr uint8_t WEIGHT_AI = 40;
+constexpr uint8_t WEIGHT_AI = 35;
 constexpr uint8_t WEIGHT_IMPACT = 25;
 constexpr uint8_t WEIGHT_ROTATION = 15;
 constexpr uint8_t WEIGHT_ORIENTATION = 10;
 constexpr uint8_t WEIGHT_INACTIVITY = 10;
+constexpr uint8_t WEIGHT_HEART = 15;
+
+constexpr float CARDIAC_TACHYCARDIA_BPM = 105.0f;
+constexpr float CARDIAC_BRADYCARDIA_BPM = 50.0f;
+constexpr float CARDIAC_HYPOXIA_SPO2 = 90.0f;
 
 constexpr size_t CALIBRATION_SAMPLES = 200;
 constexpr float CALIBRATION_MAX_LINEAR_G = 0.25f;

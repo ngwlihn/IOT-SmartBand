@@ -3151,7 +3151,20 @@
         const data = await response.json();
         const alerts = data.alerts || [];
         el.innerHTML = alerts.length
-          ? alerts.slice(-10).reverse().map(a => `<div class="text-left py-2 border-b border-slate-200 last:border-0"><b>${a.alert_type === 'SOS' ? 'SOS từ nút trên kit' : 'Cảnh báo ngã'}</b><br><span class="text-[10px] text-slate-500">${new Date(a.received_at).toLocaleString('vi-VN', {timeZone:'Asia/Ho_Chi_Minh'})}</span></div>`).join('')
+          ? alerts.slice(-10).reverse().map(a => {
+              let title = a.alert_type === 'SOS' ? 'SOS từ nút trên kit' : 'Cảnh báo ngã';
+              let badge = '';
+              if (a.fall_type === 'FALL_RECOVERED' || a.fall_movement_resumed) {
+                title = 'Cảnh báo ngã (Đã cử động lại)';
+                badge = '<span class="inline-block px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 rounded font-semibold ml-1">Cử động lại</span>';
+              } else if (a.fall_type === 'FALL_CARDIAC') {
+                title = 'Ngã do biến cố tim mạch (MAX30100)';
+                badge = '<span class="inline-block px-1.5 py-0.5 text-[9px] bg-rose-100 text-rose-800 rounded font-semibold ml-1">Tim mạch</span>';
+              } else if (a.alert_type === 'FALL') {
+                badge = '<span class="inline-block px-1.5 py-0.5 text-[9px] bg-red-100 text-red-800 rounded font-semibold ml-1">Bất động</span>';
+              }
+              return `<div class="text-left py-2 border-b border-slate-200 last:border-0"><b>${title}</b>${badge}<br><span class="text-[10px] text-slate-500">${new Date(a.received_at).toLocaleString('vi-VN', {timeZone:'Asia/Ho_Chi_Minh'})}</span></div>`;
+            }).join('')
           : 'Chưa có cảnh báo thật từ kit.';
       } catch (_) {
         el.textContent = 'Chưa kết nối được backend. Hãy kiểm tra địa chỉ IP và Wi-Fi.';
@@ -3176,7 +3189,7 @@
         localStorage.setItem('smartband_last_alert', id);
         const age = Date.now() - Date.parse(last.received_at);
         if (previous !== id && (age >= -60000 && age < 180000)) {
-          triggerFallAlarm(last.alert_type === 'SOS' ? 'SOS' : 'FALL');
+          triggerFallAlarm(last.alert_type === 'SOS' ? 'SOS' : 'FALL', last.fall_type || '', !!last.fall_movement_resumed);
           if (currentTab === 'alerts') loadRealAlerts();
         }
       } catch (_) {
@@ -4549,9 +4562,19 @@
       isAlarmRinging = false;
     }
 
-    function triggerFallAlarm(kind = 'FALL') {
+    function triggerFallAlarm(kind = 'FALL', fallType = '', movementResumed = false) {
       const label = document.getElementById('emergencyBannerText');
-      if (label) label.textContent = kind === 'SOS' ? 'SOS từ nút trên kit: Đang reo!' : 'Cảnh báo ngã: Đang reo!';
+      if (label) {
+        if (kind === 'SOS') {
+          label.textContent = 'SOS từ nút trên kit: Đang reo!';
+        } else if (fallType === 'FALL_RECOVERED' || movementResumed) {
+          label.textContent = '⚠️ Ngã (Đã cử động lại): Vui lòng kiểm tra vết thương kín & xương khớp người già!';
+        } else if (fallType === 'FALL_CARDIAC') {
+          label.textContent = '🚨 Khẩn cấp: Nghi ngờ ngã do Biến cố Tim Mạch / Tụt Huyết Áp (PPG MAX30100)!';
+        } else {
+          label.textContent = '🚨 Cảnh báo ngã khẩn cấp: Nạn nhân nằm bất động!';
+        }
+      }
       if (snoozeCountdownInterval) {
         clearInterval(snoozeCountdownInterval);
         snoozeCountdownInterval = null;

@@ -130,13 +130,22 @@ void DisplayManager::showCustom(const char* line1, const char* line2, const char
   if (available_) display.display();
 }
 
-void DisplayManager::showCrashDetected(uint8_t secondsRemaining) {
+void DisplayManager::showCrashDetected(uint8_t secondsRemaining, bool movementResumed) {
   reset();
-  center("CRASH DETECTED", 0, 1);
-  center("ARE YOU OK?", 16, 2);
-  char line[4];
-  snprintf(line, sizeof(line), "%u", secondsRemaining);
-  center(line, 42, 2);
+  if (movementResumed) {
+    center("CANH BAO NGA", 0, 1);
+    center("DA CU DONG LAI", 14, 1);
+    char line[16];
+    snprintf(line, sizeof(line), "BAO DONG: %us", secondsRemaining);
+    center(line, 30, 1);
+    center("BAM NUT NEU ON", 48, 1);
+  } else {
+    center("CRASH DETECTED", 0, 1);
+    center("ARE YOU OK?", 16, 2);
+    char line[4];
+    snprintf(line, sizeof(line), "%u", secondsRemaining);
+    center(line, 42, 2);
+  }
   if (available_) display.display();
 }
 
@@ -147,10 +156,17 @@ void DisplayManager::showRecovery() {
   if (available_) display.display();
 }
 
-void DisplayManager::showEmergency() {
+void DisplayManager::showEmergency(bool movementResumed) {
   reset();
-  center("EMERGENCY", 10, 2);
-  center("NO RESPONSE", 42, 1);
+  if (movementResumed) {
+    center("CANH BAO NGA", 0, 1);
+    center("DA CU DONG LAI", 16, 1);
+    center("KIEM TRA CHAN THUONG", 34, 1);
+    center("GOI 115 / NGUOI NHA", 50, 1);
+  } else {
+    center("EMERGENCY", 10, 2);
+    center("NGUOI GIA BAT DONG", 42, 1);
+  }
   if (available_) display.display();
 }
 

@@ -16,9 +16,9 @@ class DisplayManager {
   void showGpsStatus(const GpsData& gps);
   void showHeartHealth(const HeartData& heart);
   void showCustom(const char* line1, const char* line2, const char* line3);
-  void showCrashDetected(uint8_t secondsRemaining);
+  void showCrashDetected(uint8_t secondsRemaining, bool movementResumed = false);
   void showRecovery();
-  void showEmergency();
+  void showEmergency(bool movementResumed = false);
   void showEmergencyMedicalQr(const char* qrText, const HeartData& heart, const char* phone = nullptr);
   void showSos();
   void showCalibration();

@@ -224,14 +224,14 @@ void enterState(SystemState next) {
     lastCountdown = 255;
     buttonManager.wasPressed();
     buzzerManager.setMode(BuzzerMode::UserConfirmation);
-    displayManager.showCrashDetected(Config::CONFIRMATION_TIMEOUT_MS / 1000);
+    displayManager.showCrashDetected(Config::CONFIRMATION_TIMEOUT_MS / 1000, crashDetector.movementResumed());
   }
   if (state == SystemState::Emergency || state == SystemState::Sos) {
     alertEventMs = millis();
     lastTelemetryMs = millis() - Config::TELEMETRY_INTERVAL_MS;
     buzzerManager.setMode(BuzzerMode::Emergency);
     if (state == SystemState::Sos) displayManager.showSos();
-    else displayManager.showEmergency();
+    else displayManager.showEmergency(crashDetector.movementResumed());
   }
   if (state == SystemState::Recovery) displayManager.showRecovery();
 }
@@ -324,6 +324,10 @@ void postTelemetry(uint32_t now, const SharedData& data) {
   json["alert_type"] = state == SystemState::Sos ? "SOS" : state == SystemState::Emergency ? "FALL" : "";
   json["alert_event_ms"] = alertEventMs;
   json["alert_active"] = state == SystemState::Emergency || state == SystemState::Sos;
+  json["fall_type"] = crashDetector.fallType();
+  json["fall_movement_resumed"] = crashDetector.movementResumed();
+  json["fall_heart_rate"] = crashDetector.evidence().heartRateBpm;
+  json["fall_spo2"] = crashDetector.evidence().spo2Percent;
   json["ai"] = motionClassName(data.prediction.predictedClass);
   json["ai_normal"] = data.prediction.normal;
   json["ai_impact"] = data.prediction.impact;
@@ -349,6 +353,8 @@ void postTelemetry(uint32_t now, const SharedData& data) {
   // used by DisplayManager, so the app and the physical OLED stay consistent.
   json["display"]["state"] = stateName();
   json["display"]["ai"] = motionClassName(data.prediction.predictedClass);
+  json["display"]["fall_type"] = crashDetector.fallType();
+  json["display"]["movement_resumed"] = crashDetector.movementResumed();
   json["display"]["gps_valid"] = data.gps.locationValid;
   json["display"]["lat"] = data.gps.latitude;
   json["display"]["lon"] = data.gps.longitude;
@@ -455,20 +461,20 @@ void printFullStatus(uint32_t now, const SharedData& data) {
   Serial.println("=================================");
 }
 
-void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPrediction& prediction) {
+void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPrediction& prediction, const HeartData& heart) {
   switch (state) {
     case SystemState::Normal:
-      if (crashDetector.shouldStartAnalysis(sample, prediction)) {
-        crashDetector.beginAnalysis(sample, prediction);
+      if (crashDetector.shouldStartAnalysis(sample, prediction, heart)) {
+        crashDetector.beginAnalysis(sample, prediction, heart);
         enterState(SystemState::PossibleImpact);
       }
       break;
     case SystemState::PossibleImpact:
-      crashDetector.updateAnalysis(sample, prediction);
+      crashDetector.updateAnalysis(sample, prediction, heart);
       if (now - stateEnterMs >= Config::POSSIBLE_IMPACT_SCREEN_MS) enterState(SystemState::Analyzing);
       break;
     case SystemState::Analyzing:
-      crashDetector.updateAnalysis(sample, prediction);
+      crashDetector.updateAnalysis(sample, prediction, heart);
       if (crashDetector.analysisReady(now)) {
         evidence = crashDetector.evidence();
         if (crashDetector.crashConfirmed()) {
@@ -480,11 +486,14 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
       }
       break;
     case SystemState::UserConfirmation:
+      crashDetector.updateConfirmation(sample, heart);
       if (now - confirmationStartMs >= Config::CONFIRMATION_TIMEOUT_MS) {
         enterState(SystemState::Emergency);
       }
       break;
     case SystemState::Emergency:
+      crashDetector.updateConfirmation(sample, heart);
+      break;
     case SystemState::Sos:
       break;
     case SystemState::Recovery:
@@ -548,7 +557,7 @@ void updateDisplay(uint32_t now, const SharedData& data) {
     const uint8_t seconds = (remaining + 999) / 1000;
     if (seconds != lastCountdown) {
       lastCountdown = seconds;
-      displayManager.showCrashDetected(seconds);
+      displayManager.showCrashDetected(seconds, crashDetector.movementResumed());
     }
     return;
   }
@@ -560,7 +569,7 @@ void updateDisplay(uint32_t now, const SharedData& data) {
     const uint32_t timeInEmergency = now - stateEnterMs;
     if (timeInEmergency < 3000) {
       if (state == SystemState::Sos) displayManager.showSos();
-      else displayManager.showEmergency();
+      else displayManager.showEmergency(crashDetector.movementResumed());
     } else {
       Preferences preferences;
       preferences.begin("smartband", true);
@@ -667,9 +676,9 @@ void loop() {
   xSemaphoreGive(dataMutex);
   if (data.sampleSequence != handledSampleSequence) {
     handledSampleSequence = data.sampleSequence;
-    updateStateMachine(now, data.sample, data.prediction);
+    updateStateMachine(now, data.sample, data.prediction, data.heart);
   } else if (state == SystemState::UserConfirmation || state == SystemState::Emergency || state == SystemState::Sos || state == SystemState::Recovery) {
-    updateStateMachine(now, data.sample, data.prediction);
+    updateStateMachine(now, data.sample, data.prediction, data.heart);
   }
   updateDisplay(now, data);
   postTelemetry(now, data);
