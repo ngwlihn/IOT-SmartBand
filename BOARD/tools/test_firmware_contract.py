@@ -81,7 +81,7 @@ class FirmwareContractTest(unittest.TestCase):
         self.assertIn('json["health"]["spo2_percent"]', main)
         self.assertIn('json["health"]["retaining_last_result"]', main)
         self.assertIn("showHeartHealth", display)
-        self.assertIn('display.print("LH CON CAI:")', display)
+        self.assertIn('display.print("GOI :")', display)
         self.assertIn("state == SystemState::UserConfirmation", main)
         self.assertIn("enterState(SystemState::Sos)", main)
 

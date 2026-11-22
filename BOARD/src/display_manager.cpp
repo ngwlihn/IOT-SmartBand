@@ -23,16 +23,17 @@ bool DisplayManager::begin() {
 
 void DisplayManager::showWelcome() {
   reset();
-  center("WELCOME", 2, 1);
-  center("AI CRASH", 18, 2);
-  center("DETECTION", 42, 2);
+  center("VONG TAY Y TE", 8, 1);
+  center("AIoT", 24, 2);
+  center("KHOI DONG...", 46, 1);
   if (available_) display.display();
 }
 
 void DisplayManager::showSystemReady() {
   reset();
-  center("SYSTEM READY", 8, 1);
-  center("NORMAL", 28, 2);
+  center("HE THONG", 8, 1);
+  center("SAN SANG", 24, 2);
+  center("AN TOAN", 48, 1);
   if (available_) display.display();
 }
 
@@ -45,14 +46,14 @@ void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const W
     strftime(line, sizeof(line), "%d/%m/%Y", &timeInfo);
     center(line, 26, 1);
   } else {
-    center("SMARTBAND", 10, 2);
-    center("SEARCHING...", 34, 1);
+    center("DONG HO", 10, 2);
+    center("DANG TIM GIO...", 34, 1);
   }
   if (weather.valid) {
     snprintf(line, sizeof(line), "%.1fC  %s", weather.temperatureC, weatherName(weather.weatherCode));
     center(line, 46, 1);
   } else {
-    center("STATUS: SAFE", 46, 1);
+    center("TRANG THAI: ON DINH", 46, 1);
   }
   if (available_) display.display();
 }
@@ -60,37 +61,39 @@ void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const W
 void DisplayManager::showAiLocation(const AiPrediction& prediction, const GpsData& gps) {
   reset();
   char line[24];
-  snprintf(line, sizeof(line), "AI:%s", motionClassName(prediction.predictedClass));
-  for (char* p = line; *p; ++p) *p = toupper(*p);
+  const char* aiText = "AN TOAN";
+  if (prediction.predictedClass == MotionClass::Impact) aiText = "VA CHAM";
+  else if (prediction.predictedClass == MotionClass::Crash) aiText = "CO NGA";
+  snprintf(line, sizeof(line), "AI: %s", aiText);
   center(line, 0, 2);
-  center(gps.locationValid ? "GPS: FIX" : "GPS: SEARCH", 22, 1);
+  center(gps.locationValid ? "DINH VI: SAN SANG" : "DINH VI: DANG TIM", 22, 1);
   if (gps.locationValid) {
-    snprintf(line, sizeof(line), "LAT: %.5f", gps.latitude);
+    snprintf(line, sizeof(line), "VI DO : %.5f", gps.latitude);
     center(line, 38, 1);
-    snprintf(line, sizeof(line), "LON: %.5f", gps.longitude);
+    snprintf(line, sizeof(line), "KINH DO: %.5f", gps.longitude);
     center(line, 52, 1);
   } else {
-    center("NO LOCATION", 46, 1);
+    center("CHUA CO TOA DO", 46, 1);
   }
   if (available_) display.display();
 }
 
 void DisplayManager::showGpsStatus(const GpsData& gps) {
   reset();
-  center("GPS STATUS", 0, 1);
+  center("TRANG THAI GPS", 0, 1);
   char line[22];
   if (gps.charsProcessed == 0) {
-    center("NO NMEA DATA", 19, 1);
+    center("CHUA CO TIN HIEU", 19, 1);
     center("GPS TX -> GPIO2", 37, 1);
     center("BAUD: 9600", 52, 1);
   } else {
     snprintf(line, sizeof(line), "NMEA:%lu", gps.charsProcessed);
     center(line, 14, 1);
-    snprintf(line, sizeof(line), "SAT:%lu HDOP:%.1f", gps.satellites, gps.hdop);
+    snprintf(line, sizeof(line), "VE TINH:%lu HDOP:%.1f", gps.satellites, gps.hdop);
     center(line, 27, 1);
-    snprintf(line, sizeof(line), "SPEED:%.1f KM/H", gps.speedKmh);
+    snprintf(line, sizeof(line), "TOC DO:%.1f KM/H", gps.speedKmh);
     center(line, 40, 1);
-    snprintf(line, sizeof(line), "ALT:%.0fM %s", gps.altitudeM, gps.locationValid ? "FIX" : "SEARCH");
+    snprintf(line, sizeof(line), "CAO:%.0fM %s", gps.altitudeM, gps.locationValid ? "SAN SANG" : "DANG TIM");
     center(line, 53, 1);
   }
   if (available_) display.display();
@@ -104,13 +107,13 @@ void DisplayManager::showHeartHealth(const HeartData& heart) {
     center("MAX30100", 22, 1);
     center("DANG KET NOI...", 42, 1);
   } else if (heart.valid) {
-    snprintf(line, sizeof(line), "TIM: %.0f BPM", heart.heartRateBpm);
+    snprintf(line, sizeof(line), "NHIP TIM: %.0f L/P", heart.heartRateBpm);
     center(line, 18, 1);
     snprintf(line, sizeof(line), "SpO2: %.0f%%", heart.spo2Percent);
     center(line, 38, 2);
     if (heart.retainingLastResult) center("KQ GAN NHAT", 55, 1);
   } else {
-    center("TIM: -- BPM", 20, 1);
+    center("NHIP TIM: -- L/P", 20, 1);
     center("SpO2: -- %", 38, 2);
   }
   if (available_) display.display();
@@ -120,26 +123,26 @@ void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction
   reset();
   char line[26];
   if (heart.valid) {
-    snprintf(line, sizeof(line), "HR    : %.0f BPM", heart.heartRateBpm);
+    snprintf(line, sizeof(line), "NHIP TIM : %.0f L/P", heart.heartRateBpm);
     center(line, 6, 1);
-    snprintf(line, sizeof(line), "SpO2  : %.0f%%", heart.spo2Percent);
+    snprintf(line, sizeof(line), "SpO2     : %.0f%%", heart.spo2Percent);
     center(line, 20, 1);
   } else {
-    center("HR    : -- BPM", 6, 1);
-    center("SpO2  : -- %", 20, 1);
+    center("NHIP TIM : -- L/P", 6, 1);
+    center("SpO2     : -- %", 20, 1);
   }
 
-  const char* aiText = "SAFE";
-  if (prediction.predictedClass == MotionClass::Impact) aiText = "IMPACT";
-  else if (prediction.predictedClass == MotionClass::Crash) aiText = "FALL";
-  snprintf(line, sizeof(line), "AI    : %s", aiText);
+  const char* aiText = "AN TOAN";
+  if (prediction.predictedClass == MotionClass::Impact) aiText = "VA CHAM";
+  else if (prediction.predictedClass == MotionClass::Crash) aiText = "CO NGA";
+  snprintf(line, sizeof(line), "CU DONG  : %s", aiText);
   center(line, 35, 1);
 
   if (gps.locationValid) {
-    snprintf(line, sizeof(line), "GPS   : FIX (%lu SAT)", gps.satellites);
+    snprintf(line, sizeof(line), "DINH VI  : SAN SANG (%lu)", gps.satellites);
     center(line, 49, 1);
   } else {
-    center("GPS   : SEARCHING...", 49, 1);
+    center("DINH VI  : DANG TIM...", 49, 1);
   }
   if (available_) display.display();
 }
@@ -157,35 +160,35 @@ void DisplayManager::showCrashDetected(uint8_t secondsRemaining, bool movementRe
   char line[12];
   snprintf(line, sizeof(line), "%u", secondsRemaining);
   if (movementResumed) {
-    center("FALL DETECTED", 2, 1);
-    center("MOVING DETECTED", 16, 1);
+    center("PHAT HIEN NGA", 2, 1);
+    center("DA CU DONG LAI", 16, 1);
     center(line, 28, 2);
-    center("PRESS TO CANCEL", 48, 1);
+    center("BAM NUT DE HUY", 48, 1);
   } else {
-    center("FALL DETECTED", 2, 1);
+    center("PHAT HIEN NGA", 2, 1);
     center(line, 16, 3);
-    center("PRESS TO CANCEL", 48, 1);
+    center("BAM NUT DE HUY", 48, 1);
   }
   if (available_) display.display();
 }
 
 void DisplayManager::showRecovery() {
   reset();
-  center("I'M OK", 14, 2);
-  center("ALERT CANCELLED", 42, 1);
+  center("TOI ON", 14, 2);
+  center("DA HUY BAO DONG", 42, 1);
   if (available_) display.display();
 }
 
 void DisplayManager::showEmergency(bool movementResumed) {
   reset();
   if (movementResumed) {
-    center("EMERGENCY", 4, 2);
-    center("MOVING DETECTED", 26, 1);
-    center("CALLING 115...", 46, 1);
+    center("CAP CUU", 4, 2);
+    center("DA CU DONG LAI", 26, 1);
+    center("DANG GOI 115...", 46, 1);
   } else {
-    center("EMERGENCY", 4, 2);
-    center("FALL IMMOBILE", 26, 1);
-    center("CALLING 115...", 46, 1);
+    center("CAP CUU", 4, 2);
+    center("NAN NHAN NGA", 26, 1);
+    center("DANG GOI 115...", 46, 1);
   }
   if (available_) display.display();
 }
@@ -258,15 +261,15 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
   display.setTextSize(1);
 
   display.setCursor(textX, 6);
-  if (heart.valid) display.printf("HR: %.0f", heart.heartRateBpm);
-  else display.print("HR: --");
+  if (heart.valid) display.printf("TIM :%.0f", heart.heartRateBpm);
+  else display.print("TIM :--");
 
   display.setCursor(textX, 20);
   if (heart.valid) display.printf("SpO2:%.0f%%", heart.spo2Percent);
   else display.print("SpO2:--");
 
   display.setCursor(textX, 36);
-  display.print("CALL:");
+  display.print("GOI :");
 
   display.setCursor(textX, 48);
   display.printf("%.11s", cleanPhone.c_str());
@@ -277,21 +280,21 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
 void DisplayManager::showSos() {
   reset();
   center("SOS", 8, 3);
-  center("CALLING 115...", 44, 1);
+  center("DANG GOI 115...", 44, 1);
   if (available_) display.display();
 }
 
 void DisplayManager::showCalibration() {
   reset();
-  center("CALIBRATING", 10, 1);
-  center("KEEP STILL", 32, 2);
+  center("CAN CHINH AI", 16, 1);
+  center("GIU YEN TAY...", 36, 1);
   if (available_) display.display();
 }
 
 void DisplayManager::showCalibrationOk() {
   reset();
-  center("CALIBRATION", 12, 1);
-  center("OK", 30, 2);
+  center("CAN CHINH XONG", 16, 1);
+  center("SAN SANG", 34, 2);
   if (available_) display.display();
 }
 
@@ -321,11 +324,11 @@ void DisplayManager::center(const char* text, int16_t y, uint8_t size) {
 }
 
 const char* DisplayManager::weatherName(int code) const {
-  if (code == 0) return "CLEAR";
-  if (code <= 3) return "CLOUDY";
-  if (code <= 48) return "FOG";
-  if (code <= 67) return "RAIN";
-  if (code <= 77) return "SNOW";
-  if (code <= 82) return "SHOWER";
-  return "STORM";
+  if (code == 0) return "TROI NANG";
+  if (code <= 3) return "CO MAY";
+  if (code <= 48) return "SUONG MU";
+  if (code <= 67) return "CO MUA";
+  if (code <= 77) return "CO TUYET";
+  if (code <= 82) return "MUA RAO";
+  return "GIONG BAO";
 }
