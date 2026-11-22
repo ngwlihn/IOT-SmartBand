@@ -41,21 +41,18 @@ void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const W
   char line[24];
   if (timeValid) {
     strftime(line, sizeof(line), "%H:%M:%S", &timeInfo);
-    center(line, 2, 2);
+    center(line, 4, 2);
     strftime(line, sizeof(line), "%d/%m/%Y", &timeInfo);
-    center(line, 21, 1);
+    center(line, 26, 1);
   } else {
-    center("SMARTBAND", 4, 2);
-    center("SYNCING TIME...", 24, 1);
+    center("SMARTBAND", 10, 2);
+    center("SEARCHING...", 34, 1);
   }
-  if (available_) display.drawLine(0, 33, 127, 33, SSD1306_WHITE);
   if (weather.valid) {
     snprintf(line, sizeof(line), "%.1fC  %s", weather.temperatureC, weatherName(weather.weatherCode));
-    center(line, 39, 1);
-    snprintf(line, sizeof(line), "RAIN: %u%%", weather.rainProbability);
-    center(line, 51, 1);
+    center(line, 46, 1);
   } else {
-    center("STATUS: SAFE", 45, 1);
+    center("STATUS: SAFE", 46, 1);
   }
   if (available_) display.display();
 }
@@ -121,31 +118,28 @@ void DisplayManager::showHeartHealth(const HeartData& heart) {
 
 void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction& prediction, const GpsData& gps) {
   reset();
-  center("VITALS & STATUS", 0, 1);
-  if (available_) display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
   char line[26];
   if (heart.valid) {
-    snprintf(line, sizeof(line), "HR   : %.0f BPM", heart.heartRateBpm);
-    center(line, 14, 1);
-    snprintf(line, sizeof(line), "SpO2 : %.0f%%", heart.spo2Percent);
-    center(line, 26, 1);
+    snprintf(line, sizeof(line), "HR    : %.0f BPM", heart.heartRateBpm);
+    center(line, 6, 1);
+    snprintf(line, sizeof(line), "SpO2  : %.0f%%", heart.spo2Percent);
+    center(line, 20, 1);
   } else {
-    center("HR   : -- BPM", 14, 1);
-    center("SpO2 : -- %", 26, 1);
+    center("HR    : -- BPM", 6, 1);
+    center("SpO2  : -- %", 20, 1);
   }
 
   const char* aiText = "SAFE";
   if (prediction.predictedClass == MotionClass::Impact) aiText = "IMPACT";
   else if (prediction.predictedClass == MotionClass::Crash) aiText = "FALL";
-  snprintf(line, sizeof(line), "AI   : %s", aiText);
-  center(line, 39, 1);
+  snprintf(line, sizeof(line), "AI    : %s", aiText);
+  center(line, 35, 1);
 
   if (gps.locationValid) {
-    snprintf(line, sizeof(line), "GPS  : FIX (%lu SAT)", gps.satellites);
-    center(line, 52, 1);
+    snprintf(line, sizeof(line), "GPS   : FIX (%lu SAT)", gps.satellites);
+    center(line, 49, 1);
   } else {
-    center("GPS  : SEARCHING...", 52, 1);
+    center("GPS   : SEARCHING...", 49, 1);
   }
   if (available_) display.display();
 }
@@ -160,19 +154,16 @@ void DisplayManager::showCustom(const char* line1, const char* line2, const char
 
 void DisplayManager::showCrashDetected(uint8_t secondsRemaining, bool movementResumed) {
   reset();
+  char line[12];
+  snprintf(line, sizeof(line), "%u", secondsRemaining);
   if (movementResumed) {
-    center("FALL DETECTED", 0, 1);
-    center("MOVING DETECTED", 14, 1);
-    char line[20];
-    snprintf(line, sizeof(line), "ALERT IN: %us", secondsRemaining);
-    center(line, 30, 1);
+    center("FALL DETECTED", 2, 1);
+    center("MOVING DETECTED", 16, 1);
+    center(line, 28, 2);
     center("PRESS TO CANCEL", 48, 1);
   } else {
-    center("FALL DETECTED", 0, 1);
-    center("ARE YOU OK?", 14, 1);
-    char line[8];
-    snprintf(line, sizeof(line), "%u", secondsRemaining);
-    center(line, 28, 2);
+    center("FALL DETECTED", 2, 1);
+    center(line, 16, 3);
     center("PRESS TO CANCEL", 48, 1);
   }
   if (available_) display.display();
@@ -188,15 +179,13 @@ void DisplayManager::showRecovery() {
 void DisplayManager::showEmergency(bool movementResumed) {
   reset();
   if (movementResumed) {
-    center("EMERGENCY!", 0, 1);
-    center("MOVING DETECTED", 16, 1);
-    center("CHECK FOR INJURY", 34, 1);
-    center("CALLING 115...", 50, 1);
+    center("EMERGENCY", 4, 2);
+    center("MOVING DETECTED", 26, 1);
+    center("CALLING 115...", 46, 1);
   } else {
-    center("EMERGENCY!", 4, 1);
-    center("FALL IMMOBILE", 20, 1);
-    center("CALLING 115...", 36, 1);
-    center("SCAN QR CODE", 50, 1);
+    center("EMERGENCY", 4, 2);
+    center("FALL IMMOBILE", 26, 1);
+    center("CALLING 115...", 46, 1);
   }
   if (available_) display.display();
 }
@@ -268,22 +257,18 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
 
-  display.setCursor(textX, 2);
-  display.print("MEDICAL");
-  display.drawLine(textX, 11, 127, 11, SSD1306_WHITE);
+  display.setCursor(textX, 6);
+  if (heart.valid) display.printf("HR: %.0f", heart.heartRateBpm);
+  else display.print("HR: --");
 
-  display.setCursor(textX, 15);
-  if (heart.valid) display.printf("HR:%.0f", heart.heartRateBpm);
-  else display.print("HR:--");
-
-  display.setCursor(textX, 26);
+  display.setCursor(textX, 20);
   if (heart.valid) display.printf("SpO2:%.0f%%", heart.spo2Percent);
   else display.print("SpO2:--");
 
-  display.setCursor(textX, 37);
+  display.setCursor(textX, 36);
   display.print("CALL:");
 
-  display.setCursor(textX, 49);
+  display.setCursor(textX, 48);
   display.printf("%.11s", cleanPhone.c_str());
 
   display.display();
@@ -291,8 +276,8 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
 
 void DisplayManager::showSos() {
   reset();
-  center("SOS", 10, 2);
-  center("BUTTON HELD", 42, 1);
+  center("SOS", 8, 3);
+  center("CALLING 115...", 44, 1);
   if (available_) display.display();
 }
 
