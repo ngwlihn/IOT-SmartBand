@@ -56,7 +56,14 @@ class CrashDetector {
   float heartRateAtFall_ = 0.0f;
   float spo2AtFall_ = 0.0f;
   bool cardiacCrisis_ = false;
+  bool normalHeartConfirmed_ = false;
   bool fingerDetected_ = true;
+
+  // Bộ lọc chống rung lắc liên tục (Shake rejection via oscillation & reversal count)
+  uint8_t impactSpikeCount_ = 0;
+  bool previousSampleHigh_ = false;
+  uint8_t gyroReversals_ = 0;
+  float lastGyroSign_ = 0.0f;
 
   // Xác nhận cử động giai đoạn 2 (Two-phase verification: không tự hủy, nhưng gắn nhãn cảnh báo)
   bool movementResumed_ = false;
