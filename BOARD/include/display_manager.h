@@ -15,6 +15,7 @@ class DisplayManager {
   void showAiLocation(const AiPrediction& prediction, const GpsData& gps);
   void showGpsStatus(const GpsData& gps);
   void showHeartHealth(const HeartData& heart);
+  void showHealthStatus(const HeartData& heart, const AiPrediction& prediction, const GpsData& gps);
   void showCustom(const char* line1, const char* line2, const char* line3);
   void showCrashDetected(uint8_t secondsRemaining, bool movementResumed = false);
   void showRecovery();

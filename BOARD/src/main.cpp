@@ -505,24 +505,21 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
 uint32_t manualQrUntilMs = 0;
 
 void showNormalPages(uint32_t now, const SharedData& data) {
-  // Chu kỳ xoay trang:
-  // 0 -> 6s: Trang 0 (Giờ & Thời tiết)
-  // 6 -> 12s: Trang 1 (AI & GPS Tọa độ)
-  // 12 -> 18s: Trang 2 (GPS NMEA Status)
-  // 18 -> 32s (14 GIÂY): Trang 3 (MÃ QR CỨU HỘ & BỆNH ÁN - Giữ lâu cho camera quét)
-  const uint32_t cycleMs = 32000;
+  // Chu kỳ 3 màn hình tối ưu:
+  // 0 -> 8s (8s): Trang 0 (Đồng hồ to, Ngày tháng, Thời tiết & Trạng thái an toàn)
+  // 8 -> 15s (7s): Trang 1 (Giám sát Sức khỏe & AI: Nhịp tim, SpO2, AI cử động, Tín hiệu GPS)
+  // 15 -> 25s (10s): Trang 2 (MÃ QR CỨU HỘ Y TẾ - Quét trực tiếp hồ sơ cấp cứu)
+  const uint32_t cycleMs = 25000;
   const uint32_t cyclePos = now % cycleMs;
   uint8_t page = 0;
   if (now < manualQrUntilMs) {
-    page = 3; // Bấm nút: Ưu tiên giữ trang QR cho quét
-  } else if (cyclePos < 6000) {
+    page = 2; // Bấm nút: Ưu tiên giữ trang QR cho quét ngay lập tức
+  } else if (cyclePos < 8000) {
     page = 0;
-  } else if (cyclePos < 12000) {
+  } else if (cyclePos < 15000) {
     page = 1;
-  } else if (cyclePos < 18000) {
-    page = 2;
   } else {
-    page = 3; // Giữ 14 giây
+    page = 2;
   }
 
   if (page == lastPage && now - lastDisplayMs < Config::DISPLAY_REFRESH_MS) return;
@@ -533,10 +530,8 @@ void showNormalPages(uint32_t now, const SharedData& data) {
     const bool valid = getLocalTime(&timeInfo, 0);
     displayManager.showTimeWeather(timeInfo, valid, data.weather);
   } else if (page == 1) {
-    displayManager.showAiLocation(data.prediction, data.gps);
+    displayManager.showHealthStatus(data.heart, data.prediction, data.gps);
   } else if (page == 2) {
-    displayManager.showHeartHealth(data.heart);
-  } else if (page == 3) {
     Preferences preferences;
     preferences.begin("smartband", true);
     const String qrUrl = preferences.getString("med_url", "");

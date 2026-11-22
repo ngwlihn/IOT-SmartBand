@@ -38,27 +38,25 @@ void DisplayManager::showSystemReady() {
 
 void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const WeatherData& weather) {
   reset();
-  char line[22];
+  char line[24];
   if (timeValid) {
     strftime(line, sizeof(line), "%H:%M:%S", &timeInfo);
     center(line, 0, 2);
     strftime(line, sizeof(line), "%d/%m/%Y", &timeInfo);
-    center(line, 20, 1);
+    center(line, 19, 1);
   } else {
-    center("TIME SEARCH", 8, 1);
+    center("DONG HO THONG MINH", 2, 1);
+    center("DANG CAP NHAT GIO", 18, 1);
   }
-  if (available_) display.drawLine(0, 32, 127, 32, SSD1306_WHITE);
+  if (available_) display.drawLine(0, 31, 127, 31, SSD1306_WHITE);
   if (weather.valid) {
     snprintf(line, sizeof(line), "%.1fC  %s", weather.temperatureC, weatherName(weather.weatherCode));
-    center(line, 38, 1);
-    snprintf(line, sizeof(line), "RAIN TODAY: %u%%", weather.rainProbability);
-    center(line, 52, 1);
+    center(line, 37, 1);
+    snprintf(line, sizeof(line), "XAC SUAT MUA: %u%%", weather.rainProbability);
+    center(line, 51, 1);
   } else {
-    const char* status = "WEATHER: WAIT GPS";
-    if (weather.status == WeatherStatus::WaitWifi) status = "WEATHER: WIFI";
-    if (weather.status == WeatherStatus::Fetching) status = "WEATHER: FETCH";
-    if (weather.status == WeatherStatus::Error) status = "WEATHER: ERROR";
-    center(status, 44, 1);
+    center("THOI TIET: TU DONG", 37, 1);
+    center("HE THONG: AN TOAN", 51, 1);
   }
   if (available_) display.display();
 }
@@ -107,17 +105,48 @@ void DisplayManager::showHeartHealth(const HeartData& heart) {
   center("SUC KHOE", 0, 1);
   char line[24];
   if (!heart.sensorAvailable) {
-    center("MAX30100 ERROR", 22, 1);
-    center("SDA12 SCL10", 42, 1);
+    center("MAX30100", 22, 1);
+    center("DANG KET NOI...", 42, 1);
   } else if (heart.valid) {
-    snprintf(line, sizeof(line), "NHIP TIM: %.0f", heart.heartRateBpm);
+    snprintf(line, sizeof(line), "TIM: %.0f BPM", heart.heartRateBpm);
     center(line, 18, 1);
     snprintf(line, sizeof(line), "SpO2: %.0f%%", heart.spo2Percent);
     center(line, 38, 2);
-    if (heart.retainingLastResult) center("KQ CU - CON 30 GIAY", 55, 1);
+    if (heart.retainingLastResult) center("KQ GAN NHAT", 55, 1);
   } else {
-    center("DAT NGON TAY", 20, 1);
-    center("LEN CAM BIEN", 40, 1);
+    center("TIM: -- BPM", 20, 1);
+    center("SpO2: -- %", 38, 2);
+  }
+  if (available_) display.display();
+}
+
+void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction& prediction, const GpsData& gps) {
+  reset();
+  center("THEO DOI AN TOAN", 0, 1);
+  if (available_) display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+  char line[26];
+  if (heart.valid) {
+    snprintf(line, sizeof(line), "TIM : %.0f BPM", heart.heartRateBpm);
+    center(line, 14, 1);
+    snprintf(line, sizeof(line), "SpO2: %.0f%%", heart.spo2Percent);
+    center(line, 26, 1);
+  } else {
+    center("TIM : -- BPM", 14, 1);
+    center("SpO2: -- %", 26, 1);
+  }
+
+  const char* aiText = "AN TOAN";
+  if (prediction.predictedClass == MotionClass::Impact) aiText = "VA CHAM";
+  else if (prediction.predictedClass == MotionClass::Crash) aiText = "NGUY HIEM";
+  snprintf(line, sizeof(line), "AI  : %s", aiText);
+  center(line, 39, 1);
+
+  if (gps.locationValid) {
+    snprintf(line, sizeof(line), "GPS : SAN SANG (%lu SAT)", gps.satellites);
+    center(line, 52, 1);
+  } else {
+    center("GPS : DANG TIM VE TINH", 52, 1);
   }
   if (available_) display.display();
 }
@@ -133,39 +162,43 @@ void DisplayManager::showCustom(const char* line1, const char* line2, const char
 void DisplayManager::showCrashDetected(uint8_t secondsRemaining, bool movementResumed) {
   reset();
   if (movementResumed) {
-    center("CANH BAO NGA", 0, 1);
-    center("DA CU DONG LAI", 14, 1);
-    char line[16];
-    snprintf(line, sizeof(line), "BAO DONG: %us", secondsRemaining);
-    center(line, 30, 1);
-    center("BAM NUT NEU ON", 48, 1);
+    center("CANH BAO NGA!", 0, 1);
+    center("DA CU DONG LAI", 15, 1);
+    char line[22];
+    snprintf(line, sizeof(line), "BAO CUU HO: %us", secondsRemaining);
+    center(line, 32, 1);
+    center("BAM NUT NEU ON", 50, 1);
   } else {
-    center("CRASH DETECTED", 0, 1);
-    center("ARE YOU OK?", 16, 2);
-    char line[4];
-    snprintf(line, sizeof(line), "%u", secondsRemaining);
-    center(line, 42, 2);
+    center("CANH BAO NGA!", 0, 1);
+    center("BAN CO ON KHONG?", 16, 1);
+    char line[8];
+    snprintf(line, sizeof(line), "[ %u ]", secondsRemaining);
+    center(line, 32, 2);
+    center("BAM NUT NEU ON", 52, 1);
   }
   if (available_) display.display();
 }
 
 void DisplayManager::showRecovery() {
   reset();
-  center("I'M OK", 12, 2);
-  center("ALERT CANCELLED", 42, 1);
+  center("DA HUY BAO DONG", 10, 1);
+  center("TOI ON", 26, 2);
+  center("HE THONG AN TOAN", 48, 1);
   if (available_) display.display();
 }
 
 void DisplayManager::showEmergency(bool movementResumed) {
   reset();
   if (movementResumed) {
-    center("CANH BAO NGA", 0, 1);
+    center("CANH BAO KHAN CAP!", 0, 1);
     center("DA CU DONG LAI", 16, 1);
     center("KIEM TRA CHAN THUONG", 34, 1);
     center("GOI 115 / NGUOI NHA", 50, 1);
   } else {
-    center("EMERGENCY", 10, 2);
-    center("NGUOI GIA BAT DONG", 42, 1);
+    center("CAP CUU KHAN CAP!", 4, 1);
+    center("NAN NHAN BAT DONG", 22, 1);
+    center("DANG GOI 115", 38, 1);
+    center("QUET MA QR BEN DUOI", 52, 1);
   }
   if (available_) display.display();
 }
