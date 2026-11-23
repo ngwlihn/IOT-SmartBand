@@ -530,14 +530,19 @@ void showNormalPages(uint32_t now, const SharedData& data) {
     const bool valid = getLocalTime(&timeInfo, 0);
     displayManager.showTimeWeather(timeInfo, valid, data.weather);
   } else if (page == 1) {
-    displayManager.showHealthStatus(data.heart, data.prediction, data.gps);
+    Preferences preferences;
+    preferences.begin("smartband", true);
+    const String blood = preferences.getString("med_blood", "O+");
+    preferences.end();
+    displayManager.showHealthStatus(data.heart, data.prediction, data.gps, blood.c_str());
   } else if (page == 2) {
     Preferences preferences;
     preferences.begin("smartband", true);
     const String qrUrl = preferences.getString("med_url", "");
     const String phone = preferences.getString("med_phone", "115");
+    const String blood = preferences.getString("med_blood", "O+");
     preferences.end();
-    displayManager.showEmergencyMedicalQr(qrUrl.c_str(), data.heart, phone.c_str());
+    displayManager.showEmergencyMedicalQr(qrUrl.c_str(), data.heart, phone.c_str(), blood.c_str());
   }
 }
 
@@ -570,8 +575,9 @@ void updateDisplay(uint32_t now, const SharedData& data) {
       preferences.begin("smartband", true);
       const String qrUrl = preferences.getString("med_url", "");
       const String phone = preferences.getString("med_phone", "115");
+      const String blood = preferences.getString("med_blood", "O+");
       preferences.end();
-      displayManager.showEmergencyMedicalQr(qrUrl.c_str(), data.heart, phone.c_str());
+      displayManager.showEmergencyMedicalQr(qrUrl.c_str(), data.heart, phone.c_str(), blood.c_str());
     }
   }
 }
@@ -583,14 +589,16 @@ void setup() {
   // Initialize Medical profile default keys in NVS if not present
   Preferences medPrefs;
   if (medPrefs.begin("smartband", false)) {
-    if (!medPrefs.isKey("med_name")) medPrefs.putString("med_name", "");
-    if (!medPrefs.isKey("med_blood")) medPrefs.putString("med_blood", "--");
+    if (!medPrefs.isKey("med_name")) medPrefs.putString("med_name", "Nguoi deo");
+    if (!medPrefs.isKey("med_blood") || medPrefs.getString("med_blood").isEmpty() || medPrefs.getString("med_blood") == "--") {
+      medPrefs.putString("med_blood", "O+");
+    }
     if (!medPrefs.isKey("med_cond")) medPrefs.putString("med_cond", "CAP CUU");
     if (!medPrefs.isKey("med_phone")) medPrefs.putString("med_phone", "115");
     String curUrl = medPrefs.getString("med_url", "");
-    if (curUrl.isEmpty() || curUrl.indexOf("http") >= 0 || curUrl.indexOf("MECARD:") >= 0) {
+    if (curUrl.isEmpty() || curUrl.indexOf("http") >= 0 || curUrl.indexOf("MECARD:") >= 0 || curUrl.indexOf("Nhom mau: --") >= 0) {
       // Chuyển hoàn toàn sang Plain Text Thông tin nạn nhân (quét ra text trực tiếp, không vào danh bạ)
-      medPrefs.putString("med_url", "THONG TIN NAN NHAN\nHo ten: Nguoi deo\nNhom mau: --\nBenh ly: Can cap cuu\nLH: 115");
+      medPrefs.putString("med_url", "THONG TIN NAN NHAN\nHo ten: Nguoi deo\nNhom mau: O+\nBenh ly: Can cap cuu\nLH: 115");
     }
     medPrefs.end();
   }

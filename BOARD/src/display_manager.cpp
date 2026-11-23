@@ -119,30 +119,40 @@ void DisplayManager::showHeartHealth(const HeartData& heart) {
   if (available_) display.display();
 }
 
-void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction& prediction, const GpsData& gps) {
+void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction& prediction, const GpsData& gps, const char* bloodGroup) {
   reset();
   char line[26];
+
+  String cleanBlood = TextUtils::removeDiacritics(bloodGroup ? bloodGroup : "");
+  cleanBlood.trim();
+  cleanBlood.toUpperCase();
+  if (cleanBlood.isEmpty() || cleanBlood.indexOf("CHUA") >= 0) {
+    cleanBlood = "--";
+  }
+  snprintf(line, sizeof(line), "NHOM MAU : %s", cleanBlood.c_str());
+  center(line, 2, 1);
+
   if (heart.valid) {
     snprintf(line, sizeof(line), "NHIP TIM : %.0f L/P", heart.heartRateBpm);
-    center(line, 6, 1);
+    center(line, 14, 1);
     snprintf(line, sizeof(line), "SpO2     : %.0f%%", heart.spo2Percent);
-    center(line, 20, 1);
+    center(line, 26, 1);
   } else {
-    center("NHIP TIM : -- L/P", 6, 1);
-    center("SpO2     : -- %", 20, 1);
+    center("NHIP TIM : -- L/P", 14, 1);
+    center("SpO2     : -- %", 26, 1);
   }
 
   const char* aiText = "AN TOAN";
   if (prediction.predictedClass == MotionClass::Impact) aiText = "VA CHAM";
   else if (prediction.predictedClass == MotionClass::Crash) aiText = "CO NGA";
   snprintf(line, sizeof(line), "CU DONG  : %s", aiText);
-  center(line, 35, 1);
+  center(line, 39, 1);
 
   if (gps.locationValid) {
     snprintf(line, sizeof(line), "DINH VI  : SAN SANG (%lu)", gps.satellites);
-    center(line, 49, 1);
+    center(line, 51, 1);
   } else {
-    center("DINH VI  : DANG TIM...", 49, 1);
+    center("DINH VI  : DANG TIM...", 51, 1);
   }
   if (available_) display.display();
 }
@@ -193,11 +203,18 @@ void DisplayManager::showEmergency(bool movementResumed) {
   if (available_) display.display();
 }
 
-void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData& heart, const char* phone) {
+void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData& heart, const char* phone, const char* bloodGroup) {
   reset();
   if (!available_) return;
 
   // Lọc sạch dấu tiếng Việt và ký tự đặc biệt sang chuẩn ASCII an toàn cho màn hình OLED SSD1306
+  String cleanBlood = TextUtils::removeDiacritics(bloodGroup ? bloodGroup : "");
+  cleanBlood.trim();
+  cleanBlood.toUpperCase();
+  if (cleanBlood.isEmpty() || cleanBlood.indexOf("CHUA") >= 0) {
+    cleanBlood = "--";
+  }
+
   String cleanPhone = TextUtils::removeDiacritics(phone ? phone : "");
   cleanPhone.trim();
   if (cleanPhone.isEmpty()) cleanPhone = "115";
@@ -207,7 +224,7 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
   if (qrText && qrText[0]) {
     payload = TextUtils::removeDiacritics(qrText);
   } else {
-    payload = "LICH SU BENH: CHUA DONG BO\nLH CON CAI: " + cleanPhone;
+    payload = "THONG TIN NAN NHAN\nNhom mau: " + cleanBlood + "\nLH CON CAI: " + cleanPhone;
   }
 
   // Tự động chọn phiên bản QR Code phù hợp với độ dài văn bản
@@ -231,7 +248,7 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
   if (initRes != 0) {
     // Dự phòng an toàn nếu chuỗi quá dài: rút gọn để vừa Version 3
     char fallbackText[64];
-    snprintf(fallbackText, sizeof(fallbackText), "LICH SU BENH\nLH CON CAI: %s", cleanPhone.c_str());
+    snprintf(fallbackText, sizeof(fallbackText), "MAU: %s\nLH CON CAI: %s", cleanBlood.c_str(), cleanPhone.c_str());
     qrcode_initText(&qrcode, qrcodeData, 3, ECC_LOW, fallbackText);
   }
 
@@ -260,19 +277,22 @@ void DisplayManager::showEmergencyMedicalQr(const char* qrText, const HeartData&
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
 
-  display.setCursor(textX, 6);
+  display.setCursor(textX, 2);
+  display.printf("MAU :%s", cleanBlood.c_str());
+
+  display.setCursor(textX, 14);
   if (heart.valid) display.printf("TIM :%.0f", heart.heartRateBpm);
   else display.print("TIM :--");
 
-  display.setCursor(textX, 20);
+  display.setCursor(textX, 26);
   if (heart.valid) display.printf("SpO2:%.0f%%", heart.spo2Percent);
   else display.print("SpO2:--");
 
-  display.setCursor(textX, 36);
+  display.setCursor(textX, 39);
   display.print("GOI :");
 
-  display.setCursor(textX, 48);
-  display.printf("%.11s", cleanPhone.c_str());
+  display.setCursor(textX, 51);
+  display.printf("%.10s", cleanPhone.c_str());
 
   display.display();
 }
