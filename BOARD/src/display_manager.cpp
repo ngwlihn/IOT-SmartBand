@@ -80,22 +80,49 @@ void DisplayManager::showAiLocation(const AiPrediction& prediction, const GpsDat
 
 void DisplayManager::showGpsStatus(const GpsData& gps) {
   reset();
-  center("TRANG THAI GPS", 0, 1);
-  char line[22];
+  char line[26];
   if (gps.charsProcessed == 0) {
-    center("CHUA CO TIN HIEU", 19, 1);
-    center("GPS TX -> GPIO2", 37, 1);
-    center("BAUD: 9600", 52, 1);
-  } else {
-    snprintf(line, sizeof(line), "NMEA:%lu", gps.charsProcessed);
-    center(line, 14, 1);
-    snprintf(line, sizeof(line), "VE TINH:%lu HDOP:%.1f", gps.satellites, gps.hdop);
-    center(line, 27, 1);
-    snprintf(line, sizeof(line), "TOC DO:%.1f KM/H", gps.speedKmh);
-    center(line, 40, 1);
-    snprintf(line, sizeof(line), "CAO:%.0fM %s", gps.altitudeM, gps.locationValid ? "SAN SANG" : "DANG TIM");
-    center(line, 53, 1);
+    center("GPS: CHUA KET NOI", 12, 1);
+    center("KIEM TRA DAY NOI", 28, 1);
+    center("TX -> GPIO6 (RX)", 44, 1);
+    if (available_) display.display();
+    return;
   }
+
+  // Dòng 1 (y=2): Trạng thái Fix và số lượng vệ tinh
+  if (gps.locationValid) {
+    snprintf(line, sizeof(line), "GPS: SAN SANG (%lu VT)", gps.satellites);
+  } else if (gps.satellites > 0) {
+    snprintf(line, sizeof(line), "GPS: TIM (%lu VT)", gps.satellites);
+  } else {
+    snprintf(line, sizeof(line), "GPS: DANG TIM VE TINH");
+  }
+  center(line, 2, 1);
+
+  // Dòng 2 (y=14): Vĩ độ (Latitude)
+  if (gps.locationValid) {
+    snprintf(line, sizeof(line), "VI DO  : %.5f", gps.latitude);
+  } else {
+    snprintf(line, sizeof(line), "VI DO  : DANG DO...");
+  }
+  center(line, 14, 1);
+
+  // Dòng 3 (y=26): Kinh độ (Longitude)
+  if (gps.locationValid) {
+    snprintf(line, sizeof(line), "KINH DO: %.5f", gps.longitude);
+  } else {
+    snprintf(line, sizeof(line), "KINH DO: DANG DO...");
+  }
+  center(line, 26, 1);
+
+  // Dòng 4 (y=38): Độ chính xác HDOP và Độ cao
+  snprintf(line, sizeof(line), "HDOP:%.1f  CAO:%.0fM", gps.hdop, gps.altitudeM);
+  center(line, 38, 1);
+
+  // Dòng 5 (y=50): Tốc độ và Số lượng gói NMEA đã xử lý
+  snprintf(line, sizeof(line), "%.1fKM/H  NMEA:%lu", gps.speedKmh, gps.charsProcessed);
+  center(line, 50, 1);
+
   if (available_) display.display();
 }
 

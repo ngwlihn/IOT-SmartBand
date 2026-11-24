@@ -502,24 +502,31 @@ void updateStateMachine(uint32_t now, const MotionSample& sample, const AiPredic
   }
 }
 
-uint32_t manualQrUntilMs = 0;
+uint32_t manualHoldUntilMs = 0;
+int8_t manualPage = -1;
 
 void showNormalPages(uint32_t now, const SharedData& data) {
-  // Chu kỳ 3 màn hình tối ưu:
-  // 0 -> 8s (8s): Trang 0 (Đồng hồ to, Ngày tháng, Thời tiết & Trạng thái an toàn)
-  // 8 -> 15s (7s): Trang 1 (Giám sát Sức khỏe & AI: Nhịp tim, SpO2, AI cử động, Tín hiệu GPS)
-  // 15 -> 25s (10s): Trang 2 (MÃ QR CỨU HỘ Y TẾ - Quét trực tiếp hồ sơ cấp cứu)
-  const uint32_t cycleMs = 25000;
-  const uint32_t cyclePos = now % cycleMs;
+  // Chu kỳ 4 màn hình riêng biệt (Mỗi trang 7 giây = 28 giây / vòng lặp):
+  // 0 -> 7s  : Trang 0 (Đồng hồ to, Ngày tháng, Nhiệt độ & Thời tiết)
+  // 7 -> 14s : Trang 1 (Sức khỏe & AI: Nhóm máu, Nhịp tim, SpO2, AI cử động)
+  // 14 -> 21s: Trang 2 (MÀN HÌNH ĐỊNH VỊ GPS RIÊNG: Vệ tinh, Vĩ độ, Kinh độ, HDOP, Độ cao, Tốc độ, Gói tin NMEA)
+  // 21 -> 28s: Trang 3 (MÃ QR CỨU HỘ Y TẾ - Quét trực tiếp thông tin cấp cứu & SĐT người thân)
   uint8_t page = 0;
-  if (now < manualQrUntilMs) {
-    page = 2; // Bấm nút: Ưu tiên giữ trang QR cho quét ngay lập tức
-  } else if (cyclePos < 8000) {
-    page = 0;
-  } else if (cyclePos < 15000) {
-    page = 1;
+  if (now < manualHoldUntilMs && manualPage >= 0) {
+    page = static_cast<uint8_t>(manualPage);
   } else {
-    page = 2;
+    manualPage = -1;
+    const uint32_t cycleMs = 28000;
+    const uint32_t cyclePos = now % cycleMs;
+    if (cyclePos < 7000) {
+      page = 0;
+    } else if (cyclePos < 14000) {
+      page = 1;
+    } else if (cyclePos < 21000) {
+      page = 2;
+    } else {
+      page = 3;
+    }
   }
 
   if (page == lastPage && now - lastDisplayMs < Config::DISPLAY_REFRESH_MS) return;
@@ -536,6 +543,8 @@ void showNormalPages(uint32_t now, const SharedData& data) {
     preferences.end();
     displayManager.showHealthStatus(data.heart, data.prediction, data.gps, blood.c_str());
   } else if (page == 2) {
+    displayManager.showGpsStatus(data.gps);
+  } else if (page == 3) {
     Preferences preferences;
     preferences.begin("smartband", true);
     const String qrUrl = preferences.getString("med_url", "");
@@ -656,7 +665,12 @@ void loop() {
       enterState(SystemState::Recovery);
       Serial.println("[SOS] Alarm stopped by short press; AI status continues in telemetry");
     } else if (state == SystemState::Normal) {
-      manualQrUntilMs = now + 25000;
+      if (manualPage < 0) {
+        manualPage = 2; // Bấm 1 lần: Mở và GIỮ màn hình GPS 25 giây để theo dõi định vị!
+      } else {
+        manualPage = (manualPage + 1) % 4; // Bấm tiếp: Chuyển trang thủ công (GPS -> QR -> Đồng hồ -> Sức khỏe)
+      }
+      manualHoldUntilMs = now + 25000;
       lastPage = 255;
     }
   }
