@@ -23,8 +23,9 @@ bool DisplayManager::begin() {
 
 void DisplayManager::showWelcome() {
   reset();
-  center("VONG TAY Y TE", 16, 1);
-  center("KHOI DONG...", 38, 1);
+  center("VONG TAY", 8, 2);
+  center("Y TE", 28, 2);
+  center("KHOI DONG...", 50, 1);
   if (available_) display.display();
 }
 
@@ -42,8 +43,8 @@ void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const W
   tm localTime = timeInfo;
   if (!timeValid) {
     uint32_t sec = millis() / 1000;
-    localTime.tm_hour = (12 + (sec / 3600)) % 24;
-    localTime.tm_min = (sec / 60) % 60;
+    localTime.tm_hour = (16 + (sec / 3600)) % 24;
+    localTime.tm_min = (15 + (sec / 60)) % 60;
     localTime.tm_sec = sec % 60;
     localTime.tm_mday = 24;
     localTime.tm_mon = 10;
@@ -56,11 +57,11 @@ void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const W
   center(line, 26, 1);
 
   if (weather.valid) {
-    snprintf(line, sizeof(line), "%.1fC  %s", weather.temperatureC, weatherName(weather.weatherCode));
-    center(line, 46, 1);
+    snprintf(line, sizeof(line), "%.0fC %s", weather.temperatureC, weatherShortName(weather.weatherCode));
   } else {
-    center("28.0C  TROI NANG", 46, 1);
+    snprintf(line, sizeof(line), "28C NANG");
   }
+  center(line, 42, 2);
   if (available_) display.display();
 }
 
@@ -156,34 +157,27 @@ void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction
   reset();
   char line[26];
 
-  String cleanBlood = TextUtils::removeDiacritics(bloodGroup ? bloodGroup : "");
-  cleanBlood.trim();
-  cleanBlood.toUpperCase();
-  if (cleanBlood.isEmpty() || cleanBlood.indexOf("CHUA") >= 0) {
-    cleanBlood = "--";
-  }
-  snprintf(line, sizeof(line), "NHOM MAU : %s", cleanBlood.c_str());
-  center(line, 2, 1);
-
+  // Dòng 1 (Size 2, y=3): Nhịp tim
   if (heart.valid) {
     snprintf(line, sizeof(line), "TIM: %.0f", heart.heartRateBpm);
   } else {
     snprintf(line, sizeof(line), "TIM: --");
   }
-  center(line, 15, 2);
+  center(line, 3, 2);
 
+  // Dòng 2 (Size 2, y=23): Nồng độ oxy SpO2
   if (heart.valid) {
     snprintf(line, sizeof(line), "SpO2:%.0f%%", heart.spo2Percent);
   } else {
     snprintf(line, sizeof(line), "SpO2:--%%");
   }
-  center(line, 33, 2);
+  center(line, 23, 2);
 
+  // Dòng 3 (Size 2, y=44): Trạng thái Cử động AI cỡ to
   const char* aiText = "AN TOAN";
   if (prediction.predictedClass == MotionClass::Impact) aiText = "VA CHAM";
   else if (prediction.predictedClass == MotionClass::Crash) aiText = "CO NGA";
-  snprintf(line, sizeof(line), "CU DONG: %s", aiText);
-  center(line, 52, 1);
+  center(aiText, 44, 2);
 
   if (available_) display.display();
 }
@@ -382,4 +376,14 @@ const char* DisplayManager::weatherName(int code) const {
   if (code <= 77) return "CO TUYET";
   if (code <= 82) return "MUA RAO";
   return "GIONG BAO";
+}
+
+const char* DisplayManager::weatherShortName(int code) const {
+  if (code == 0) return "NANG";
+  if (code <= 3) return "MAY";
+  if (code <= 48) return "SUONG";
+  if (code <= 67) return "MUA";
+  if (code <= 77) return "TUYET";
+  if (code <= 82) return "RAO";
+  return "BAO";
 }

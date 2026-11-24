@@ -30,6 +30,7 @@ class DisplayManager {
   void reset();
   void center(const char* text, int16_t y, uint8_t size);
   const char* weatherName(int code) const;
+  const char* weatherShortName(int code) const;
 
   bool available_ = false;
 };
