@@ -151,6 +151,9 @@ void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction
   if (gps.locationValid) {
     snprintf(line, sizeof(line), "DINH VI  : SAN SANG (%lu)", gps.satellites);
     center(line, 51, 1);
+  } else if (gps.satellites > 0) {
+    snprintf(line, sizeof(line), "DINH VI  : TIM (%lu VT)", gps.satellites);
+    center(line, 51, 1);
   } else {
     center("DINH VI  : DANG TIM...", 51, 1);
   }

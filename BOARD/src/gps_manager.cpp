@@ -35,8 +35,8 @@ void GpsManager::update() {
   if (gps_.hdop.isValid()) data_.hdop = gps_.hdop.hdop();
 
   if (gps_.location.isUpdated()) {
-    const bool qualityOk = gps_.location.isValid() && data_.satellites >= 4 &&
-                           data_.hdop > 0 && data_.hdop <= Config::GPS_MAX_HDOP;
+    const bool qualityOk = gps_.location.isValid() && data_.satellites >= 3 &&
+                           (data_.hdop == 0 || data_.hdop <= Config::GPS_MAX_HDOP);
     if (qualityOk) acceptLocation(gps_.location.lat(), gps_.location.lng(), data_.speedKmh, now);
   }
   data_.locationValid = hasAcceptedLocation_ && now - lastAcceptedMs_ <= Config::GPS_HOLD_VALID_MS;

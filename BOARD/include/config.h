@@ -50,7 +50,7 @@ constexpr uint32_t TELEMETRY_INTERVAL_MS = 2000;
 constexpr uint32_t HEART_SENSOR_INTERVAL_MS = 10;
 constexpr uint32_t HEART_RESULT_HOLD_MS = 30000;
 constexpr uint32_t GPS_HOLD_VALID_MS = 15000;
-constexpr float GPS_MAX_HDOP = 5.0f;
+constexpr float GPS_MAX_HDOP = 8.0f;
 constexpr float GPS_JITTER_DEADBAND_M = 3.0f;
 constexpr float GPS_JUMP_CONFIRM_M = 80.0f;
 
