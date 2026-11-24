@@ -23,9 +23,8 @@ bool DisplayManager::begin() {
 
 void DisplayManager::showWelcome() {
   reset();
-  center("VONG TAY Y TE", 8, 1);
-  center("AIoT", 24, 2);
-  center("KHOI DONG...", 46, 1);
+  center("VONG TAY Y TE", 16, 1);
+  center("KHOI DONG...", 38, 1);
   if (available_) display.display();
 }
 
@@ -40,20 +39,27 @@ void DisplayManager::showSystemReady() {
 void DisplayManager::showTimeWeather(const tm& timeInfo, bool timeValid, const WeatherData& weather) {
   reset();
   char line[24];
-  if (timeValid) {
-    strftime(line, sizeof(line), "%H:%M:%S", &timeInfo);
-    center(line, 4, 2);
-    strftime(line, sizeof(line), "%d/%m/%Y", &timeInfo);
-    center(line, 26, 1);
-  } else {
-    center("DONG HO", 10, 2);
-    center("DANG TIM GIO...", 34, 1);
+  tm localTime = timeInfo;
+  if (!timeValid) {
+    uint32_t sec = millis() / 1000;
+    localTime.tm_hour = (12 + (sec / 3600)) % 24;
+    localTime.tm_min = (sec / 60) % 60;
+    localTime.tm_sec = sec % 60;
+    localTime.tm_mday = 24;
+    localTime.tm_mon = 10;
+    localTime.tm_year = 126; // 2026
   }
+
+  strftime(line, sizeof(line), "%H:%M:%S", &localTime);
+  center(line, 4, 2);
+  strftime(line, sizeof(line), "%d/%m/%Y", &localTime);
+  center(line, 26, 1);
+
   if (weather.valid) {
     snprintf(line, sizeof(line), "%.1fC  %s", weather.temperatureC, weatherName(weather.weatherCode));
     center(line, 46, 1);
   } else {
-    center("TRANG THAI: ON DINH", 46, 1);
+    center("28.0C  TROI NANG", 46, 1);
   }
   if (available_) display.display();
 }
@@ -160,30 +166,25 @@ void DisplayManager::showHealthStatus(const HeartData& heart, const AiPrediction
   center(line, 2, 1);
 
   if (heart.valid) {
-    snprintf(line, sizeof(line), "NHIP TIM : %.0f L/P", heart.heartRateBpm);
-    center(line, 14, 1);
-    snprintf(line, sizeof(line), "SpO2     : %.0f%%", heart.spo2Percent);
-    center(line, 26, 1);
+    snprintf(line, sizeof(line), "TIM: %.0f", heart.heartRateBpm);
   } else {
-    center("NHIP TIM : -- L/P", 14, 1);
-    center("SpO2     : -- %", 26, 1);
+    snprintf(line, sizeof(line), "TIM: --");
   }
+  center(line, 15, 2);
+
+  if (heart.valid) {
+    snprintf(line, sizeof(line), "SpO2:%.0f%%", heart.spo2Percent);
+  } else {
+    snprintf(line, sizeof(line), "SpO2:--%%");
+  }
+  center(line, 33, 2);
 
   const char* aiText = "AN TOAN";
   if (prediction.predictedClass == MotionClass::Impact) aiText = "VA CHAM";
   else if (prediction.predictedClass == MotionClass::Crash) aiText = "CO NGA";
-  snprintf(line, sizeof(line), "CU DONG  : %s", aiText);
-  center(line, 39, 1);
+  snprintf(line, sizeof(line), "CU DONG: %s", aiText);
+  center(line, 52, 1);
 
-  if (gps.locationValid) {
-    snprintf(line, sizeof(line), "DINH VI  : SAN SANG (%lu)", gps.satellites);
-    center(line, 51, 1);
-  } else if (gps.satellites > 0) {
-    snprintf(line, sizeof(line), "DINH VI  : TIM (%lu VT)", gps.satellites);
-    center(line, 51, 1);
-  } else {
-    center("DINH VI  : DANG TIM...", 51, 1);
-  }
   if (available_) display.display();
 }
 

@@ -3,6 +3,7 @@
 #include "config.h"
 
 #include <math.h>
+#include <sys/time.h>
 
 namespace {
 double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
@@ -43,6 +44,25 @@ void GpsManager::update() {
   data_.charsProcessed = gps_.charsProcessed();
   data_.sentencesWithFix = gps_.sentencesWithFix();
   data_.failedChecksum = gps_.failedChecksum();
+
+  // Đồng bộ đồng hồ RTC của vi điều khiển ESP32 trực tiếp từ vệ tinh GPS (Chuẩn nguyên tử UTC+7)
+  if (gps_.time.isValid() && gps_.date.isValid() && gps_.date.year() >= 2024 && gps_.time.age() < 1500) {
+    static uint32_t lastGpsSyncMs = 0;
+    if (now - lastGpsSyncMs > 30000 || lastGpsSyncMs == 0) {
+      lastGpsSyncMs = now;
+      tm t{};
+      t.tm_year = gps_.date.year() - 1900;
+      t.tm_mon = gps_.date.month() - 1;
+      t.tm_mday = gps_.date.day();
+      t.tm_hour = gps_.time.hour();
+      t.tm_min = gps_.time.minute();
+      t.tm_sec = gps_.time.second();
+      time_t epoch = mktime(&t);
+      epoch += 7 * 3600; // Giờ Việt Nam (UTC+7)
+      timeval tv{epoch, 0};
+      settimeofday(&tv, nullptr);
+    }
+  }
 }
 
 void GpsManager::acceptLocation(double latitude, double longitude, float speedKmh, uint32_t nowMs) {
